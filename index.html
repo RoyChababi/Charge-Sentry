@@ -1,0 +1,1907 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ChargeSentry · Live demo</title>
+<link rel="icon" href="data:,">
+<style>
+/* =====================================================================
+   DESIGN TOKENS
+   ===================================================================== */
+:root{
+  --cs-white:#FFFFFF; --cs-ink:#1A1A1A; --cs-grey-600:#5B6670; --cs-grey-200:#E3E8ED;
+  --cs-green:#2ECC71; --cs-amber:#F5A623; --cs-red:#E5484D; --cs-blue:#3B82F6;
+  --green-ink:#17703D; --amber-ink:#8A5300; --red-ink:#B4232A; --blue-ink:#1D4ED8;
+  --green-bg:#E7F8EE; --amber-bg:#FEF3DF; --red-bg:#FDECEC; --blue-bg:#EAF1FE; --grey-bg:#F3F5F7;
+  --grey-400:#AEB7C0; --line:#E3E8ED;
+  --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --ease:cubic-bezier(.2,.8,.2,1);
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 10px 28px rgba(16,24,40,.07);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#E3E8ED;font-family:var(--font);color:var(--cs-ink);-webkit-font-smoothing:antialiased}
+button{font-family:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--cs-blue);outline-offset:2px;border-radius:6px}
+.num{font-variant-numeric:tabular-nums}
+.ic{display:inline-block;vertical-align:middle;flex:none}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+#viewport{position:fixed;inset:0;overflow:hidden;background:linear-gradient(160deg,#EEF1F4 0%,#E3E8ED 100%)}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;background:linear-gradient(160deg,#EEF1F4 0%,#E3E8ED 100%)}
+
+/* ---------- Top bar ---------- */
+#topbar{position:absolute;left:0;right:0;top:0;height:56px;display:flex;align-items:center;padding:0 24px;gap:16px;background:rgba(255,255,255,.72);border-bottom:1px solid #D8DEE4;z-index:30}
+.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:-.01em}
+.chip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 12px;border-radius:14px;font-size:13px;font-weight:600;background:var(--grey-bg);color:var(--cs-grey-600);border:1px solid var(--line);white-space:nowrap}
+.chip-dark{background:var(--cs-ink);color:#fff;border-color:var(--cs-ink)}
+.chip-proto{background:#FFF8E8;color:#7A4A00;border-color:#F3D9A4}
+.tb-center{flex:1;display:flex;justify-content:center;align-items:baseline;gap:12px}
+.tb-clock{font-size:24px;font-weight:700}
+.tb-date{font-size:13px;color:var(--cs-grey-600)}
+.tb-right{display:flex;align-items:center;gap:10px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--cs-green);display:inline-block}
+.iconbtn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:#fff;display:inline-flex;align-items:center;justify-content:center;color:var(--cs-ink)}
+.iconbtn:hover{background:var(--grey-bg)}
+#soundHint{background:var(--blue-bg);color:var(--blue-ink);border-color:#C9DAFB;cursor:pointer}
+
+/* ---------- Columns ---------- */
+#cols{position:absolute;top:56px;bottom:40px;left:0;right:0;padding:16px 20px;display:grid;grid-template-columns:34fr 30fr 36fr;gap:16px}
+.card{background:#fff;border-radius:16px;box-shadow:var(--shadow);position:relative;overflow:hidden;display:flex;flex-direction:column;padding:14px 18px 16px;min-height:0}
+.col-label{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--cs-grey-600);display:flex;align-items:center;gap:8px;height:22px;margin-bottom:8px;flex:none}
+
+/* ---------- Ticker ---------- */
+#ticker{position:absolute;left:0;right:0;bottom:0;height:40px;display:flex;align-items:center;gap:18px;padding:0 24px;background:#1C2126;color:#E9EDF1;font-size:13px;z-index:30;overflow:hidden}
+.tk-label{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#AEB7C0;flex:none}
+#tkItems{display:flex;gap:28px;flex:1;min-width:0;overflow:hidden}
+.tk-item{display:flex;align-items:center;gap:8px;white-space:nowrap;animation:tkIn .35s var(--ease)}
+.tk-item:not(:first-child){opacity:.7}
+.tk-time{color:#AEB7C0}
+@keyframes tkIn{from{transform:translateX(-24px);opacity:0}to{transform:none;opacity:1}}
+
+/* ---------- Severity helpers ---------- */
+.sev-dot{width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none;color:#fff}
+.sv-info,.sv-timer{background:var(--cs-blue)} .sv-ok{background:var(--green-ink)} .sv-warning,.sv-ambient{background:#C77C00} .sv-alert{background:var(--cs-red)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:13px;font-size:13px;font-weight:700;white-space:nowrap}
+.t-grey{background:var(--grey-bg);color:var(--cs-grey-600)} .t-green{background:var(--green-bg);color:var(--green-ink)}
+.t-amber{background:var(--amber-bg);color:var(--amber-ink)} .t-red{background:var(--red-bg);color:var(--red-ink)}
+.t-blue{background:var(--blue-bg);color:var(--blue-ink)} .t-offline{background:#fff;color:var(--cs-grey-600);border:1px dashed var(--grey-400)}
+
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.04)}}
+.pulse{animation:pulse 1.2s ease-in-out infinite}
+
+/* =====================================================================
+   MANAGER DASHBOARD
+   ===================================================================== */
+.mgr-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex:none}
+.mgr-title{font-size:20px;font-weight:800;letter-spacing:-.01em}
+.mgr-sub{font-size:13px;color:var(--cs-grey-600);margin-top:2px}
+.mgr-head .chips{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0;flex:none}
+.kpi{background:var(--grey-bg);border-radius:12px;padding:10px 12px}
+.kpi-v{font-size:28px;font-weight:800;line-height:1.1}
+.kpi-l{font-size:12px;color:var(--cs-grey-600);font-weight:600;line-height:1.25;margin-top:2px}
+.kpi.bump{animation:bump .6s var(--ease)}
+@keyframes bump{0%{background:var(--grey-bg)}30%{background:#DDF3E6}100%{background:var(--grey-bg)}}
+.mgr-body{flex:1;display:grid;grid-template-columns:1fr 190px;gap:14px;min-height:0}
+.mgr-left{display:flex;flex-direction:column;min-height:0}
+.sec-title{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--cs-grey-600);margin:0 0 8px;display:flex;justify-content:space-between;align-items:center}
+.ugrid-wrap{position:relative}
+.ugrid{display:grid;grid-template-columns:16px repeat(8,1fr);gap:6px;align-items:center}
+.floor{font-size:12px;font-weight:700;color:var(--cs-grey-600);text-align:center}
+.utile{height:50px;border-radius:10px;border:1.5px solid var(--line);background:var(--grey-bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;font-size:13px;font-weight:700;color:var(--cs-grey-600);position:relative;padding:0;transition:background .25s,border-color .25s,color .25s}
+.utile:hover{filter:brightness(.97)}
+.utile .ic{width:14px;height:14px}
+.utile.st-charging{background:var(--green-bg);border-color:var(--cs-green);color:var(--green-ink)}
+.utile.st-warning,.utile.st-ambient{background:var(--amber-bg);border-color:var(--cs-amber);color:var(--amber-ink)}
+.utile.st-alert{background:var(--cs-red);border-color:var(--red-ink);color:#fff}
+.utile.st-timerStop,.utile.st-acknowledged{background:var(--blue-bg);border-color:var(--cs-blue);color:var(--blue-ink)}
+.utile.st-offline{background:#fff;border:1.5px dashed var(--grey-400);color:var(--cs-grey-600)}
+.utile.live::after{content:"";position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--cs-ink);box-shadow:0 0 0 2px #fff}
+.legend{display:flex;flex-wrap:wrap;gap:10px 14px;margin-top:10px;font-size:12px;color:var(--cs-grey-600);font-weight:600}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.lg{width:12px;height:12px;border-radius:3px;display:inline-block;border:1.5px solid}
+.tooltip{position:absolute;z-index:5;pointer-events:none;background:#1C2126;color:#fff;font-size:13px;padding:8px 10px;border-radius:8px;white-space:nowrap;box-shadow:var(--shadow);opacity:0;transition:opacity .15s}
+.tooltip.show{opacity:1}
+.tooltip b{display:block;font-size:14px}
+.spot{margin-top:14px;border:1px solid var(--line);border-radius:14px;padding:12px 14px;flex:none}
+.spot-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.spot-name{font-weight:800;font-size:15px}
+.spot-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:10px}
+.spot-v{font-size:22px;font-weight:800}
+.spot-l{font-size:12px;color:var(--cs-grey-600);font-weight:600}
+.feed{display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--line);padding-left:12px}
+.feed-list{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:8px}
+.feed-item{display:flex;gap:8px;font-size:12.5px;line-height:1.3;animation:feedIn .35s var(--ease)}
+.feed-item .sev-dot{width:16px;height:16px;margin-top:1px}
+.feed-time{color:var(--cs-grey-600);font-size:12px}
+.feed-item.sev-alert .feed-msg{color:var(--red-ink);font-weight:700}
+@keyframes feedIn{from{transform:translateY(-10px);opacity:0}to{transform:none;opacity:1}}
+
+.mbanner{position:absolute;left:12px;right:12px;top:12px;z-index:8;border-radius:12px;padding:12px 14px;display:flex;align-items:center;gap:12px;color:#fff;font-weight:700;font-size:15px;box-shadow:0 12px 30px rgba(0,0,0,.18);transform:translateY(-140%);transition:transform .28s var(--ease)}
+.mbanner.show{transform:none}
+.mbanner.b-red{background:linear-gradient(90deg,#C9353B,#E5484D)}
+.mbanner.b-green{background:var(--green-ink)}
+.mbanner .grow{flex:1}
+.mbanner button{height:34px;border-radius:9px;border:0;padding:0 14px;font-weight:700;background:#fff;color:var(--cs-ink)}
+.mbanner .x{background:transparent;color:#fff;width:34px;padding:0}
+
+.drawer{position:absolute;top:0;right:0;bottom:0;width:100%;background:#fff;z-index:7;transform:translateX(102%);transition:transform .3s var(--ease);display:flex;flex-direction:column;padding:16px 18px;box-shadow:-10px 0 30px rgba(0,0,0,.08)}
+.drawer.open{transform:none}
+.drawer.pushdown{padding-top:76px}
+.dr-head{display:flex;align-items:center;gap:10px}
+.dr-title{font-size:20px;font-weight:800;flex:1}
+.dr-body{flex:1;overflow:auto;margin-top:10px;display:flex;flex-direction:column;gap:12px;scrollbar-width:none}
+.dr-body::-webkit-scrollbar{display:none}
+.dr-sec{border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.dr-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:4px 0}
+.dr-row .k{color:var(--cs-grey-600)}
+.dr-read{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.dr-read .v{font-size:22px;font-weight:800}
+.dr-read .l{font-size:12px;color:var(--cs-grey-600);font-weight:600}
+.dr-ev{display:flex;gap:8px;font-size:13px;padding:5px 0;border-bottom:1px solid var(--grey-bg)}
+.dr-ev:last-child{border-bottom:0}
+.dr-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-top:12px;flex:none}
+.mbtn{height:44px;border-radius:11px;border:1px solid var(--line);background:#fff;font-weight:700;font-size:14px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.mbtn:hover{background:var(--grey-bg)}
+.mbtn.primary{background:var(--cs-red);border-color:var(--cs-red);color:#fff}
+.mbtn.primary:hover{background:#D63B40}
+.mbtn:disabled{opacity:.45;cursor:not-allowed}
+.safe-chip{display:flex;align-items:center;gap:8px;background:var(--green-bg);color:var(--green-ink);font-weight:800;border-radius:12px;padding:10px 12px;font-size:15px}
+.mmodal{position:absolute;inset:0;z-index:9;background:rgba(20,24,28,.45);display:none;align-items:center;justify-content:center}
+.mmodal.show{display:flex}
+.mmodal .box{background:#fff;border-radius:16px;padding:22px;width:340px;text-align:center;box-shadow:var(--shadow)}
+
+/* =====================================================================
+   PHONE FRAME
+   ===================================================================== */
+.phone-col{align-items:center}
+.phone-col .col-label{align-self:stretch}
+.phone-holder{position:relative;width:386px;height:808px;flex:none}
+.phone-holder.shake{animation:shake .55s ease-out}
+@keyframes shake{0%,100%{transform:translateX(0)}12%{transform:translateX(-11px)}26%{transform:translateX(10px)}40%{transform:translateX(-8px)}55%{transform:translateX(6px)}70%{transform:translateX(-4px)}85%{transform:translateX(2px)}}
+.phone{position:absolute;top:0;left:50%;margin-left:-207px;width:414px;height:868px;border-radius:60px;background:#15181B;padding:12px;transform:scale(.93);transform-origin:top center;box-shadow:0 0 0 2px #2A2F34 inset,0 24px 50px rgba(15,20,25,.28),0 4px 10px rgba(15,20,25,.2)}
+.screen{position:relative;width:390px;height:844px;border-radius:48px;overflow:hidden;background:#fff;isolation:isolate}
+.island{position:absolute;top:11px;left:50%;margin-left:-62px;width:124px;height:36px;border-radius:20px;background:#000;z-index:80}
+.statusbar{position:absolute;top:0;left:0;right:0;height:54px;display:flex;align-items:center;justify-content:space-between;padding:6px 30px 0 40px;font-size:16px;font-weight:700;z-index:65;background:rgba(255,255,255,.92)}
+.statusbar.dark{background:transparent;color:#fff}
+.sb-icons{display:flex;align-items:center;gap:6px}
+.homebar{position:absolute;bottom:8px;left:50%;margin-left:-67px;width:134px;height:5px;border-radius:3px;background:#111;z-index:85;pointer-events:none}
+.homebar.light{background:#fff}
+.pview{position:absolute;top:54px;bottom:84px;left:0;right:0;overflow-y:auto;overflow-x:hidden;padding:6px 16px 24px;scrollbar-width:none;user-select:none;-webkit-user-select:none}
+.pview::-webkit-scrollbar{display:none}
+.pview.dragging{cursor:grabbing}
+.tabbar{position:absolute;left:0;right:0;bottom:0;height:84px;border-top:1px solid var(--line);background:rgba(255,255,255,.96);display:grid;grid-template-columns:repeat(4,1fr);padding:6px 6px 24px;z-index:20}
+.tab{border:0;background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:600;color:var(--cs-grey-600);position:relative;border-radius:10px}
+.tab.on{color:var(--cs-ink)}
+.tab.on .ic{color:var(--cs-ink)}
+.badge{position:absolute;top:2px;left:50%;margin-left:6px;min-width:18px;height:18px;border-radius:9px;background:var(--cs-red);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;padding:0 5px}
+
+/* phone content */
+.p-top{display:flex;justify-content:space-between;align-items:center;margin:6px 0 14px}
+.p-greet{font-size:22px;font-weight:800;letter-spacing:-.01em}
+.p-sub{font-size:13px;color:var(--cs-grey-600);margin-top:2px}
+.avatar{width:40px;height:40px;border-radius:50%;background:var(--cs-ink);color:#fff;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center;flex:none}
+.p-title{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:8px 0 14px}
+.p-back{display:flex;align-items:center;gap:6px;margin:4px 0 10px}
+.p-back button{border:0;background:transparent;display:inline-flex;align-items:center;gap:2px;font-size:16px;font-weight:600;color:var(--blue-ink);padding:6px 4px 6px 0}
+.p-back h2{font-size:18px;margin:0;flex:1;text-align:center;padding-right:56px}
+.hero{border-radius:22px;padding:18px;display:flex;align-items:center;gap:14px;border:1.5px solid;transition:background .3s,border-color .3s;cursor:default;width:100%;text-align:left;font:inherit}
+.hero.h-idle{background:var(--grey-bg);border-color:var(--line)}
+.hero.h-charging{background:var(--green-bg);border-color:#9FE3BC}
+.hero.h-warning,.hero.h-ambient{background:var(--amber-bg);border-color:#F6CF8A}
+.hero.h-alert{background:var(--red-bg);border-color:var(--cs-red);cursor:pointer}
+.hero.h-timerStop,.hero.h-acknowledged{background:var(--blue-bg);border-color:#B9CFFB}
+.hero-ic{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.h-idle .hero-ic{background:var(--cs-grey-600)} .h-charging .hero-ic{background:var(--green-ink)}
+.h-warning .hero-ic,.h-ambient .hero-ic{background:#C77C00} .h-alert .hero-ic{background:var(--cs-red)}
+.h-timerStop .hero-ic,.h-acknowledged .hero-ic{background:var(--blue-ink)}
+.hero-txt{flex:1;min-width:0}
+.hero-state{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.h-idle .hero-state{color:var(--cs-grey-600)} .h-charging .hero-state{color:var(--green-ink)}
+.h-warning .hero-state,.h-ambient .hero-state{color:var(--amber-ink)} .h-alert .hero-state{color:var(--red-ink)}
+.h-timerStop .hero-state,.h-acknowledged .hero-state{color:var(--blue-ink)}
+.hero-title{font-size:19px;font-weight:800;line-height:1.2;margin-top:2px}
+.hero-s{font-size:13px;color:#3E4850;margin-top:4px;line-height:1.35}
+.ring{position:relative;width:84px;height:84px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring-v{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1}
+.ring-v b{font-size:28px;font-weight:800}
+.ring-v > span{font-size:11px;color:var(--cs-grey-600);font-weight:700;margin-top:2px}
+.ring .arc{transition:stroke-dashoffset .6s linear,stroke .3s}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.tile{border:1px solid var(--line);border-radius:16px;padding:10px 10px 6px;background:#fff;transition:background .3s,border-color .3s}
+.tile-l{font-size:12px;font-weight:700;color:var(--cs-grey-600);display:flex;align-items:center;gap:4px}
+.tile-v{font-size:28px;font-weight:800;line-height:1.15;margin-top:4px;letter-spacing:-.02em}
+.tile-v small{font-size:13px;font-weight:700;color:var(--cs-grey-600);margin-left:2px;letter-spacing:0}
+.tile.tone-amber{background:var(--amber-bg);border-color:#F6CF8A}
+.tile.tone-red{background:var(--red-bg);border-color:var(--cs-red)}
+.tile.tone-red .tile-v{color:var(--red-ink)} .tile.tone-amber .tile-v{color:var(--amber-ink)}
+.spark{width:100%;height:28px;display:block;margin-top:4px}
+.spark polyline{fill:none;stroke-width:2;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.pcard{border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-top:12px}
+.srow{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.srow .k{font-size:12px;color:var(--cs-grey-600);font-weight:600}
+.srow .v{font-size:15px;font-weight:800;margin-top:2px}
+.btn{width:100%;height:52px;border-radius:15px;border:0;font-size:16px;font-weight:800;display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;transition:transform .1s,background .2s}
+.btn:active{transform:scale(.98)}
+.btn-dark{background:var(--cs-ink);color:#fff}
+.btn-outline{background:#fff;border:1.5px solid var(--red-ink);color:var(--red-ink)}
+.btn-red{background:var(--cs-red);color:#fff}
+.btn-light{background:var(--grey-bg);color:var(--cs-ink)}
+.btn-blue{background:var(--blue-ink);color:#fff}
+.h-sec{font-size:13px;font-weight:800;color:var(--cs-grey-600);letter-spacing:.06em;text-transform:uppercase;margin:18px 2px 8px}
+.devs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.dev{border:1px solid var(--line);border-radius:14px;background:#fff;padding:10px;text-align:left;display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700}
+.dev:hover{background:var(--grey-bg)}
+.dev-top{display:flex;justify-content:space-between;align-items:center;color:var(--cs-grey-600)}
+.dev-meta{font-size:12px;color:var(--cs-grey-600);font-weight:600;display:flex;align-items:center;gap:5px}
+.online{width:8px;height:8px;border-radius:50%;background:var(--cs-green);display:inline-block}
+.list{border:1px solid var(--line);border-radius:16px;overflow:hidden}
+.li{display:flex;align-items:center;gap:12px;padding:12px 14px;border-bottom:1px solid var(--line);background:#fff;width:100%;border-left:0;border-right:0;border-top:0;text-align:left;font-size:15px}
+.li:last-child{border-bottom:0}
+button.li:hover{background:var(--grey-bg)}
+.li .grow{flex:1;min-width:0}
+.li .t{font-weight:600}
+.li .d{font-size:13px;color:var(--cs-grey-600);margin-top:2px;line-height:1.3}
+.li.unread .t{font-weight:800}
+.li .when{font-size:12px;color:var(--cs-grey-600);white-space:nowrap}
+.unread-dot{width:9px;height:9px;border-radius:50%;background:var(--cs-blue);flex:none}
+.li-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.switch{width:51px;height:31px;border-radius:16px;border:0;background:#D1D7DD;position:relative;flex:none;transition:background .2s;padding:0}
+.switch::after{content:"";position:absolute;top:2px;left:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.2);transition:transform .2s var(--ease)}
+.switch[aria-checked="true"]{background:var(--green-ink)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+.switch:disabled{opacity:.6;cursor:not-allowed}
+.range{width:100%;accent-color:var(--cs-ink)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--grey-bg);border-radius:11px;padding:3px;margin-bottom:10px}
+.seg button{border:0;background:transparent;height:32px;border-radius:9px;font-weight:700;font-size:14px;color:var(--cs-grey-600)}
+.seg button.on{background:#fff;color:var(--cs-ink);box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.rchip{font-size:12px;font-weight:800;padding:3px 8px;border-radius:8px;white-space:nowrap}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;border-bottom:1px solid var(--line);font-size:15px}
+.kv:last-child{border-bottom:0}
+.kv .k{color:var(--cs-grey-600)}
+.kv .v{font-weight:700;text-align:right}
+.big-ill{display:flex;justify-content:center;margin:20px 0 10px}
+.note{font-size:12px;color:var(--cs-grey-600);text-align:center;margin-top:14px;line-height:1.4}
+.trend-card{background:var(--amber-bg);border:1px solid #F6CF8A;border-radius:16px;padding:14px;margin-top:12px}
+.trend-card b{color:var(--amber-ink)}
+
+/* splash, notification, overlays */
+.splash{position:absolute;inset:0;background:#fff;z-index:90;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;transition:opacity .4s ease-out;cursor:pointer}
+.splash.hide{opacity:0;pointer-events:none}
+.splash .wm{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.notif{position:absolute;top:52px;left:10px;right:10px;z-index:70;background:rgba(250,251,252,.97);border-radius:20px;padding:12px 14px;box-shadow:0 14px 34px rgba(0,0,0,.22);transform:translateY(-220px);opacity:0;pointer-events:none;transition:transform .32s var(--ease),opacity .2s;display:flex;gap:10px;cursor:pointer;border:1px solid var(--line);text-align:left;width:calc(100% - 20px);font:inherit}
+.notif.show{transform:none;opacity:1;pointer-events:auto}
+.notif .n-app{font-size:12px;font-weight:700;color:var(--cs-grey-600);display:flex;justify-content:space-between;letter-spacing:.04em;text-transform:uppercase}
+.notif .n-t{font-size:15px;font-weight:800;margin-top:2px}
+.notif .n-b{font-size:13px;color:#3E4850;margin-top:2px;line-height:1.3}
+.notif .grow{flex:1;min-width:0}
+.overlay{position:absolute;inset:0;z-index:50;display:none}
+.overlay.show{display:block}
+.alert-scr{position:absolute;inset:0;background:linear-gradient(180deg,#E5484D 0%,#C9353B 60%);color:#fff;padding:64px 20px 30px;overflow-y:auto;scrollbar-width:none;animation:slideUp .3s var(--ease)}
+.alert-scr::-webkit-scrollbar{display:none}
+.alert-scr.ack{background:linear-gradient(180deg,#1E7A45 0%,#17703D 60%)}
+@keyframes slideUp{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+.as-icon{width:84px;height:84px;border-radius:26px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;margin:6px auto 12px}
+.as-title{font-size:28px;font-weight:800;text-align:center;line-height:1.15}
+.as-sub{font-size:15px;text-align:center;margin-top:8px;line-height:1.4;color:#FFF5F5}
+.tl{margin:18px 0 6px;background:rgba(0,0,0,.16);border-radius:16px;padding:12px 14px}
+.tl-i{display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:14px;line-height:1.3}
+.tl-i .tt{font-size:12px;opacity:.9;width:62px;flex:none;padding-top:1px}
+.tl-i .tdot{width:18px;height:18px;border-radius:50%;background:#fff;color:#C9353B;display:flex;align-items:center;justify-content:center;flex:none}
+.tl-i.off{opacity:.65}
+.tl-i.off .tdot{background:rgba(255,255,255,.35);color:#fff}
+.as-btns{display:grid;gap:10px;margin-top:14px}
+.as-btn{height:54px;border-radius:15px;border:0;font-weight:800;font-size:17px;display:flex;align-items:center;justify-content:center;gap:8px}
+.as-btn.white{background:#fff;color:var(--red-ink)}
+.as-btn.ghost{background:rgba(255,255,255,.16);color:#fff;border:1.5px solid rgba(255,255,255,.55)}
+.as-btn.sim-tap{animation:simtap .45s ease-out}
+@keyframes simtap{0%{transform:scale(1);box-shadow:0 0 0 0 rgba(255,255,255,.8)}40%{transform:scale(.95)}100%{transform:scale(1);box-shadow:0 0 0 18px rgba(255,255,255,0)}}
+.guide{font-size:14px;line-height:1.45;background:rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;margin-top:14px}
+.sheet-wrap{position:absolute;inset:0;z-index:60;background:rgba(10,12,14,.42);display:flex;align-items:flex-end;animation:fade .2s}
+@keyframes fade{from{opacity:0}to{opacity:1}}
+.sheet{background:#fff;width:100%;border-radius:26px 26px 0 0;padding:16px 20px 40px;animation:slideUp .28s var(--ease);max-height:88%;overflow:auto;scrollbar-width:none}
+.sheet::-webkit-scrollbar{display:none}
+.sheet .grab{width:40px;height:5px;border-radius:3px;background:#D1D7DD;margin:0 auto 14px}
+.call{position:absolute;inset:0;z-index:60;background:linear-gradient(180deg,#2B3138,#111417);color:#fff;display:flex;flex-direction:column;align-items:center;padding:110px 24px 60px;animation:fade .2s}
+.call .who{font-size:30px;font-weight:700;margin-top:18px}
+.call .st{font-size:16px;opacity:.85;margin-top:6px}
+.call .simnote{margin-top:auto;font-size:13px;background:rgba(255,255,255,.12);border-radius:12px;padding:10px 14px;text-align:center}
+.endcall{width:72px;height:72px;border-radius:50%;background:var(--cs-red);border:0;color:#fff;display:flex;align-items:center;justify-content:center;margin-top:22px}
+.search{position:relative;width:150px;height:150px;margin:16px auto}
+.search i{position:absolute;inset:0;border-radius:50%;border:3px solid var(--cs-blue);animation:ringOut 1.8s ease-out infinite}
+.search i:nth-child(2){animation-delay:.6s} .search i:nth-child(3){animation-delay:1.2s}
+.search .core{position:absolute;inset:45px;border-radius:50%;background:var(--cs-ink);color:#fff;display:flex;align-items:center;justify-content:center}
+@keyframes ringOut{0%{transform:scale(.4);opacity:.9}100%{transform:scale(1.15);opacity:0}}
+.steps{display:flex;gap:6px;justify-content:center;margin:6px 0 4px}
+.steps span{width:28px;height:5px;border-radius:3px;background:var(--line)}
+.steps span.on{background:var(--cs-ink)}
+.succ{width:90px;height:90px;border-radius:50%;background:var(--green-ink);color:#fff;display:flex;align-items:center;justify-content:center;margin:20px auto 10px;animation:pop .4s var(--ease)}
+@keyframes pop{from{transform:scale(.5);opacity:0}to{transform:none;opacity:1}}
+.caption{position:absolute;left:50%;bottom:14px;transform:translate(-50%,20px);background:rgba(20,24,28,.92);color:#fff;font-size:17px;font-weight:700;padding:10px 18px;border-radius:14px;white-space:nowrap;opacity:0;transition:opacity .3s,transform .3s var(--ease);z-index:10;pointer-events:none;max-width:96%}
+.caption.show{opacity:1;transform:translate(-50%,0)}
+
+/* =====================================================================
+   DEVICE DIAGRAM
+   ===================================================================== */
+#diagSvg{width:100%;height:auto;display:block}
+#diagSvg text{font-family:var(--font)}
+.cable{fill:none;stroke:#2B3138;stroke-width:7;stroke-linecap:round;transition:stroke .3s}
+.dead .cable,.cable.dead{stroke:#C3CAD1}
+.flow{fill:none;stroke:var(--cs-green);stroke-width:3;stroke-dasharray:7 9;stroke-linecap:round;opacity:0;transition:opacity .3s;animation:flow .8s linear infinite}
+.flow.on{opacity:1}
+@keyframes flow{to{stroke-dashoffset:-32}}
+.wisp{fill:none;stroke-width:3;stroke-linecap:round;animation:wisp 2.8s ease-in infinite;opacity:0}
+@keyframes wisp{0%{transform:translateY(0);opacity:0}25%{opacity:.85}100%{transform:translateY(-48px);opacity:0}}
+.led{transition:fill .3s}
+.cutbadge{opacity:0;transition:opacity .2s;transform-box:fill-box;transform-origin:center}
+.cutbadge.show{opacity:1}
+.charts{display:grid;gap:14px;margin-top:10px}
+.chart-h{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;font-weight:700;color:var(--cs-grey-600);margin-bottom:4px}
+.chart-h b{font-size:18px;color:var(--cs-ink)}
+.chart canvas{width:100%;height:150px;display:block;border-radius:10px;background:#FAFBFC;border:1px solid var(--line)}
+.diag-status{display:flex;align-items:center;gap:10px;margin-top:10px;flex:none}
+.diag-status .txt{font-size:13px;color:var(--cs-grey-600)}
+
+/* =====================================================================
+   PRESENTER PANEL
+   ===================================================================== */
+#presenter{position:absolute;top:56px;right:0;bottom:40px;width:320px;background:rgba(17,20,24,.97);backdrop-filter:blur(6px);color:#EEF1F4;z-index:40;transform:translateX(102%);visibility:hidden;transition:transform .28s var(--ease),visibility 0s linear .28s;padding:16px;overflow-y:auto;scrollbar-width:none;font-size:13px;box-shadow:-12px 0 30px rgba(0,0,0,.25)}
+#presenter::-webkit-scrollbar{display:none}
+#presenter.open{transform:none;visibility:visible;transition:transform .28s var(--ease)}
+.pp-h{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.pp-h b{font-size:16px}
+.pp-sec{border-top:1px solid rgba(255,255,255,.12);padding-top:10px;margin-top:10px}
+.pp-t{font-size:11px;letter-spacing:.09em;text-transform:uppercase;color:#AEB7C0;font-weight:700;margin-bottom:8px}
+.pp-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pp-btn{display:flex;align-items:center;gap:8px;height:36px;border-radius:9px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:#fff;font-size:13px;font-weight:600;padding:0 8px;text-align:left}
+.pp-btn:hover{background:rgba(255,255,255,.14)}
+.pp-btn.hot{border-color:#E5484D;background:rgba(229,72,77,.22)}
+.pp-btn.wide{grid-column:1/-1;justify-content:center}
+kbd{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11px;background:rgba(255,255,255,.16);border-radius:5px;padding:2px 6px;min-width:20px;text-align:center;color:#fff}
+.pp-read{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.pp-read div{background:rgba(255,255,255,.06);border-radius:8px;padding:6px 8px}
+.pp-read .l{font-size:11px;color:#AEB7C0}
+.pp-read .v{font-size:15px;font-weight:700}
+.pp-row{display:flex;justify-content:space-between;align-items:center;gap:8px;margin:4px 0}
+.pp-state{font-size:15px;font-weight:800}
+.pp-next{background:rgba(255,255,255,.06);border-radius:8px;padding:8px;line-height:1.4}
+.pp-x{background:transparent;border:1px solid rgba(255,255,255,.2);color:#fff}
+.pp-x:hover{background:rgba(255,255,255,.1)}
+
+@media (prefers-reduced-motion: reduce){
+  .pulse,.phone-holder.shake,.wisp,.search i,.flow,.as-btn.sim-tap,.kpi.bump{animation:none !important}
+  .wisp{opacity:.6}
+}
+</style>
+</head>
+<body>
+<div id="viewport">
+<div id="stage">
+
+  <header id="topbar">
+    <div class="logo" id="logo"></div>
+    <span class="chip chip-dark"><span class="dot" style="background:#FF5A5F" aria-hidden="true"></span>Live demo</span>
+    <div class="tb-center">
+      <span class="tb-clock num" data-live="clockS" aria-label="Simulated clock">21:30:00</span>
+      <span class="tb-date" id="tbDate"></span>
+      <span class="chip num" id="tbSpeed" title="Simulation speed">5× speed</span>
+    </div>
+    <div class="tb-right">
+      <button class="chip" id="soundHint" aria-label="Click to enable sound"></button>
+      <span class="chip chip-proto" id="protoBadge">Prototype · simulated data</span>
+      <span class="chip" id="simStatus"><span class="dot" id="simDot" aria-hidden="true"></span><span>Simulated</span></span>
+      <button class="iconbtn" id="gearBtn" aria-label="Open presenter controls (P)"></button>
+    </div>
+  </header>
+
+  <main id="cols">
+    <!-- ===== Manager ===== -->
+    <section class="card" id="mgrCard" aria-label="Building manager view">
+      <div class="col-label" id="mgrLabel"></div>
+      <div class="mgr-head">
+        <div>
+          <div class="mgr-title" id="bName"></div>
+          <div class="mgr-sub" id="bSub"></div>
+        </div>
+        <div class="chips">
+          <span class="chip" id="onlineChip"></span>
+          <span class="chip chip-dark" id="planChip"></span>
+        </div>
+      </div>
+      <div class="kpis" id="kpis"></div>
+      <div class="mgr-body">
+        <div class="mgr-left">
+          <div class="sec-title"><span>Units · tap for details</span><span id="liveUnitNote"></span></div>
+          <div class="ugrid-wrap">
+            <div class="ugrid" id="ugrid"></div>
+            <div class="tooltip" id="utip" role="tooltip"></div>
+          </div>
+          <div class="legend" id="legend"></div>
+          <div class="spot" id="spot"></div>
+        </div>
+        <div class="feed">
+          <div class="sec-title">Alert feed</div>
+          <div class="feed-list" id="feedList" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="mbanner" id="mBanner" role="alert"></div>
+      <div class="drawer" id="drawer" aria-label="Unit details"></div>
+      <div class="mmodal" id="mModal"></div>
+    </section>
+
+    <!-- ===== Phone ===== -->
+    <section class="card phone-col" id="phoneCard" aria-label="Tenant app">
+      <div class="col-label" id="phoneLabel"></div>
+      <div class="phone-holder" id="phoneHolder">
+        <div class="phone">
+          <div class="screen" id="pscreen">
+            <div class="island" aria-hidden="true"></div>
+            <div class="statusbar" id="statusbar"><span class="num" data-live="clock">21:30</span><span class="sb-icons" id="sbIcons"></span></div>
+            <div class="pview" id="pview"></div>
+            <nav class="tabbar" id="tabbar" aria-label="App tabs"></nav>
+            <div class="overlay" id="poverlay"></div>
+            <button class="notif" id="pnotif" aria-live="assertive" aria-label="Notification"></button>
+            <div class="splash" id="splash" aria-label="Skip splash"></div>
+            <div class="homebar" id="homebar" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+      <div class="caption" id="caption" aria-live="polite"></div>
+    </section>
+
+    <!-- ===== Diagram ===== -->
+    <section class="card" id="diagCard" aria-label="What's happening at the outlet">
+      <div class="col-label" id="diagLabel"></div>
+      <div id="diagWrap"></div>
+      <div class="charts">
+        <div class="chart"><div class="chart-h"><span>Battery temperature · °C · last 2 min</span><b class="num"><span data-live="temp">22.0</span> °C</b></div><canvas id="chTemp" aria-label="Battery temperature chart"></canvas></div>
+        <div class="chart"><div class="chart-h"><span>Off-gas at the battery · VOC index · last 2 min</span><b class="num" data-live="voc">50</b></div><canvas id="chVoc" aria-label="Off-gas VOC chart"></canvas></div>
+      </div>
+      <div class="diag-status" id="diagStatus"></div>
+    </section>
+  </main>
+
+  <footer id="ticker" aria-label="Event log">
+    <span class="tk-label">Event log</span>
+    <div id="tkItems" aria-live="polite"></div>
+  </footer>
+
+  <aside id="presenter" aria-label="Presenter controls"></aside>
+</div>
+</div>
+
+<script>
+'use strict';
+/* =====================================================================
+   UTILITIES
+   ===================================================================== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const pad2 = n => String(n).padStart(2, '0');
+const ERRORS = [];
+function logError(e) { ERRORS.push(String(e && e.stack || e)); try { console.error('[ChargeSentry] handled error:', e); } catch (_) {} }
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+function fmtHMS(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + ':' + pad2(d.getSeconds()); }
+function fmtHM(ms) { const d = new Date(ms); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
+function fmtDur(sec) { sec = Math.max(0, Math.floor(sec)); const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60); return h ? `${h} h ${pad2(m)} min` : `${m} min`; }
+function fmtDay(ms) { return new Date(ms).toLocaleDateString('en-CA', { weekday: 'short', month: 'short', day: 'numeric' }); }
+function fmtDayShort(ms) { return new Date(ms).toLocaleDateString('en-CA', { weekday: 'short' }); }
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const UI_TIMERS = new Set();
+function later(fn, ms) { const id = setTimeout(() => { UI_TIMERS.delete(id); try { fn(); } catch (e) { logError(e); } }, ms); UI_TIMERS.add(id); return id; }
+function clearLater(id) { if (id) { clearTimeout(id); UI_TIMERS.delete(id); } }
+function clearAllLater() { UI_TIMERS.forEach(id => clearTimeout(id)); UI_TIMERS.clear(); }
+function setText(el, v) { if (el && el.textContent !== v) el.textContent = v; }
+
+const ICONS = {
+  plug: '<path d="M9 2v5M15 2v5M6 7h12v4a6 6 0 0 1-12 0V7zM12 17v5"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"/>',
+  shield: '<path d="M12 2 4 5.2v6.3c0 5 3.4 9.1 8 10.5 4.6-1.4 8-5.5 8-10.5V5.2L12 2z"/>',
+  shieldCheck: '<path d="M12 2 4 5.2v6.3c0 5 3.4 9.1 8 10.5 4.6-1.4 8-5.5 8-10.5V5.2L12 2z"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
+  shieldX: '<path d="M12 2 4 5.2v6.3c0 5 3.4 9.1 8 10.5 4.6-1.4 8-5.5 8-10.5V5.2L12 2z"/><path d="m9.5 9 5 5M14.5 9l-5 5"/>',
+  thermo: '<path d="M14 14.8V4.5a2 2 0 1 0-4 0v10.3a4 4 0 1 0 4 0z"/><path d="M12 9v7"/>',
+  vapor: '<path d="M7 20c-2-2.5 2-4.5 0-7s2-4.5 0-7M12 20c-2-2.5 2-4.5 0-7s2-4.5 0-7M17 20c-2-2.5 2-4.5 0-7s2-4.5 0-7"/>',
+  power: '<path d="M12 2v9M18.4 6.6a9 9 0 1 1-12.8 0"/>',
+  home: '<path d="M3 11 12 3.5l9 7.5M5.5 9.5V20h5v-6h3v6h5V9.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  bell: '<path d="M6 9a6 6 0 1 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9zM10 20a2 2 0 0 0 4 0"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',
+  check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+  x: '<path d="M6 6l12 12M18 6 6 18"/>',
+  phone: '<path d="M5 3.5h3.5l2 5-2.5 1.6a11 11 0 0 0 5.9 5.9l1.6-2.5 5 2v3.5a2 2 0 0 1-2 2A17 17 0 0 1 3 5.5a2 2 0 0 1 2-2z"/>',
+  alert: '<path d="M12 3.5 2.5 20h19L12 3.5z"/><path d="M12 10v4.5M12 17.2v.1"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.8v.1"/>',
+  timer: '<circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2.5 1.5M9.5 2.5h5"/>',
+  box: '<path d="M3 7.5 12 3l9 4.5v9L12 21l-9-4.5v-9z"/><path d="M3 7.5l9 4.5 9-4.5M12 12v9"/>',
+  pod: '<rect x="7" y="3" width="10" height="18" rx="4"/><circle cx="12" cy="8" r="1.4"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  chevL: '<path d="m15 18-6-6 6-6"/>',
+  chevR: '<path d="m9 18 6-6-6-6"/>',
+  download: '<path d="M12 3v12M7 10.5l5 5 5-5M5 21h14"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  sound: '<path d="M11 5 6 9H2.5v6H6l5 4V5zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9.5 9.5 0 0 1 0 13"/>',
+  mute: '<path d="M11 5 6 9H2.5v6H6l5 4V5zM22 9l-6 6M16 9l6 6"/>',
+  wifiOff: '<path d="M2 2l20 20M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5-2.7M19 13a10 10 0 0 0-2.3-1.6M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 10.7 5M12 20h.01"/>',
+  wifi: '<path d="M2 8.8a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 20h.01"/>',
+  building: '<path d="M4 21V3.5h10V21M14 9h6v12M7.5 7.5h3M7.5 11h3M7.5 14.5h3M2.5 21h19"/>',
+  doc: '<path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14 2.5V7.5h5M9 12.5h7M9 16.5h7"/>',
+  chart: '<path d="M4 20V11M10 20V4.5M16 20v-7M2.5 20.5h19"/>',
+  play: '<path d="M7 4.5v15l12-7.5z"/>',
+  pause: '<path d="M7 4.5v15M17 4.5v15"/>',
+  reset: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v5h5"/>',
+  full: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>',
+  minus: '<path d="M5 12h14"/>',
+  cc: '<rect x="3" y="5" width="18" height="14" rx="3"/><path d="M10.5 10a2.5 2.5 0 1 0 0 4M17 10a2.5 2.5 0 1 0 0 4"/>',
+  heart: '<path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 7.3 4.3 4.3 0 0 1 19.5 10c0 5.4-7.5 10-7.5 10z"/>',
+  file: '<path d="M6 2.5h8.5L19 7v14.5H6z"/><path d="M14 2.5V7.5h5"/>'
+};
+function icon(n, size = 20, cls = '') { return `<svg class="ic ${cls}" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ''}</svg>`; }
+function logoSvg(size = 34, id = '') {
+  return `<svg width="${size}" height="${size}" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 2 4 6.5v8.2C4 22.3 9.2 28 16 30c6.8-2 12-7.7 12-15.3V6.5L16 2z" fill="#1A1A1A"/><path d="M17.6 7.5 10.8 17.4h4.7l-1.1 7.1 6.8-9.9h-4.7l1.1-7.1z" fill="#fff"/><circle ${id ? `id="${id}"` : ''} cx="24.6" cy="7.4" r="4.2" fill="#2ECC71" stroke="#fff" stroke-width="2"/></svg>`;
+}
+
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const CONFIG = {
+  tickMs: 250,
+  speeds: [1, 5, 20, 60],
+  defaultSpeedIdx: 1,
+  startHour: 21, startMin: 30,
+  base: { temp: 22.0, podVoc: 50, roomVoc: 45 },
+  chargeRate: 0.012,          // % per sim-second
+  startPct: 34,
+  powerNominal: 140, powerMin: 40, taperStart: 85,
+  faultPowerW: 210,
+  tempLoadGain: 9,
+  tempK: 0.05,                // easing per sim-second
+  podK: 0.15, roomK: 0.08, vocSlowK: 0.06, slowDecayS: 60,
+  heatWarnC: 45, heatWarnHoldS: 5, heatClearC: 43,
+  vocRise: 150,
+  vocAlert: 250, vocAlertHoldS: 3, roomNormalMax: 120, roomAmbientMin: 200, vocClear: 200,
+  criticalC: 60,
+  currentFactor: 1.3, currentHoldS: 4,
+  timerDefaultH: 6,
+  cutLatencyS: 0.8,
+  testCutMs: 3000,
+  notifMs: 5000, captionMs: 3000,
+  histLen: 120
+};
+
+const STRINGS = {
+  badge: 'Prototype · simulated data',
+  cols: { mgr: 'Building manager view', phone: 'Tenant app', diag: "What's happening at the outlet" },
+  tenant: { name: 'Maya L.', first: 'Maya', initials: 'ML', unit: 'Unit 304', address: '4820 Rue Fictive, Montréal', battery: 'Commuter e-bike, 48 V 13 Ah', phone: '514-555-0163' },
+  building: { name: 'Les Habitations Fictives', company: 'Gestion Laurier Inc.', units: 40, plan: 'Building plan · $3/unit/month', phone: '514-555-0142' },
+  states: {
+    idle: { label: 'Not charging', title: 'Not charging', sub: 'Plug ready. Tap Start charge when you plug in.', icon: 'plug', tone: 'grey' },
+    charging: { label: 'Charging', title: 'Charging safely', sub: 'All sensors normal. Power stays on.', icon: 'bolt', tone: 'green' },
+    warning: { label: 'Warning', title: 'Battery running warm', sub: 'Power still on. ChargeSentry is watching closely.', icon: 'thermo', tone: 'amber' },
+    ambient: { label: 'Ambient', title: 'Room vapour detected, no action needed', sub: 'Room air is also elevated, likely cooking. Charging continues.', icon: 'vapor', tone: 'amber' },
+    alert: { label: 'Alert', title: 'Power cut. Off-gas detected', sub: 'Tap to see what happened.', icon: 'shieldX', tone: 'red' },
+    timerStop: { label: 'Timer stop', title: 'Charge stopped by timer', sub: 'The charge reached your time limit.', icon: 'timer', tone: 'blue' },
+    acknowledged: { label: 'Resolved', title: 'Incident resolved', sub: "Marked safe. Power stays off until you restart.", icon: 'shieldCheck', tone: 'blue' },
+    offline: { label: 'Offline', title: 'Offline', icon: 'wifiOff', tone: 'offline' }
+  },
+  alerts: {
+    offgas: { hero: 'Power cut. Off-gas detected', title: 'Power cut automatically', cause: 'Off-gas detected at the battery.', banner: 'Unit 304: Power cut, off-gas detected', ticker: 'Unit 304 · Off-gas confirmed at the battery', notif: 'Off-gas detected at the battery. Power was cut automatically.', rising: 'Off-gas rising at the battery', confirm: 'Confirmed by pod (room air normal)' },
+    heat: { hero: 'Power cut. Critical battery heat', title: 'Power cut automatically', cause: 'Critical battery heat detected.', banner: 'Unit 304: Power cut, critical battery heat', ticker: 'Unit 304 · Battery above 60 °C', notif: 'Battery temperature passed 60 °C. Power was cut automatically.', rising: 'Battery temperature climbing', confirm: 'Confirmed above 60 °C by pod' },
+    electrical: { hero: 'Power cut. Charger fault', title: 'Power cut automatically', cause: 'Abnormal current draw from the charger.', banner: 'Unit 304: Power cut, charger fault', ticker: 'Unit 304 · Abnormal current draw (210 W)', notif: 'The charger drew too much current. Power was cut automatically.', rising: 'Current draw spiked above normal', confirm: 'Confirmed over 4 s by the plug' }
+  },
+  guidance: 'Leave the battery in the box. Do not unplug or move it. Keep the door closed and leave the unit if you see smoke.',
+  contacts: [{ name: 'Jonah L.', rel: 'Brother', phone: '514-555-0187' }, { name: 'Priya S.', rel: 'Roommate', phone: '438-555-0119' }],
+  results: { normal: ['Normal', 't-green'], timer: ['Timer stop', 't-blue'], ambient: ['Ambient ignored', 't-amber'], cut: ['Power cut', 't-red'] },
+  about: 'Prototype for BUSA 465. Simulated data.',
+  captions: {}
+};
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let S = null;
+const RNG = { sim: null, bld: null };
+const UI = {
+  tab: 'home', stack: [], overlay: null, sheet: null, drawer: null, banner: null,
+  notifT: null, captionT: null, captionsOn: true, soundOn: true, panelOpen: false,
+  histWeek: 0, splashDone: false, lastScreenKey: '', pair: null, pairTimers: [], tip: null
+};
+
+function demoStart() { const d = new Date(); d.setHours(CONFIG.startHour, CONFIG.startMin, 0, 0); return d.getTime(); }
+
+function buildSeed(r, startMs) {
+  const DAY = 86400000;
+  // ---- 14 nights of charge history for unit 304 (newest first)
+  const sessions = [];
+  for (let i = 1; i <= 14; i++) {
+    const d = new Date(startMs - i * DAY); d.setHours(21 + Math.floor(r() * 2), Math.floor(r() * 60), 0, 0);
+    let durH = 1.5 + r() * 1.5;
+    const age = (i - 1) / 13;
+    let maxT = 34.0 - age * 1.9 + (r() - 0.5) * 0.5;
+    if (i === 1) maxT = 34.0;
+    let result = 'normal';
+    if (i === 9) { result = 'timer'; durH = 6; }
+    if (i === 4 || i === 11) result = 'ambient';
+    sessions.push({ start: d.getTime(), durH: +durH.toFixed(2), maxT: +maxT.toFixed(1), result });
+  }
+  // ---- 6-week heat trend (weekly peak), slow upward drift
+  const trendVals = [30.0, 30.8, 31.5, 32.3, 33.1, 34.0];
+  const trend = trendVals.map((v, i) => ({ week: startMs - (5 - i) * 7 * DAY, v }));
+  // ---- tenant alert history (3 items, all resolved)
+  const tenantAlerts = [];
+  sessions.forEach(s => {
+    if (s.result === 'timer') tenantAlerts.push({ id: 'h' + s.start, time: s.start + 6 * 3600000, type: 'timer', sev: 'timer', title: 'Charge stopped by timer', detail: 'Stopped at your 6 h limit. Battery was full.', read: true, resolved: true });
+    if (s.result === 'ambient') tenantAlerts.push({ id: 'h' + s.start, time: s.start + 1800000, type: 'ambient', sev: 'ambient', title: 'Room vapour detected, no action', detail: 'Pod and room air rose together, likely cooking. Charging continued.', read: true, resolved: true });
+  });
+  tenantAlerts.sort((a, b) => b.time - a.time);
+  // ---- building units
+  const units = {}; const L = 'ABCDEFGHJKLMNPRSTVWY';
+  const eligible = [];
+  for (let f = 1; f <= 5; f++) for (let n = 1; n <= 8; n++) {
+    const id = f * 100 + n;
+    const ini = id === 304 ? 'M.L.' : L[Math.floor(r() * L.length)] + '.' + L[Math.floor(r() * L.length)] + '.';
+    const u = { id, floor: f, initials: ini, state: 'idle', temp: +(21.5 + r() * 1.6).toFixed(1), pct: Math.round(20 + r() * 60), power: 0, voc: Math.round(42 + r() * 14) };
+    if (id === 207 || id === 415) u.state = 'offline';
+    else if (id !== 304) eligible.push(id);
+    units[id] = u;
+  }
+  for (let k = 0; k < 8; k++) {
+    const idx = Math.floor(r() * eligible.length); const id = eligible.splice(idx, 1)[0];
+    const u = units[id]; u.state = 'charging'; u.temp = +(27 + r() * 5).toFixed(1); u.power = Math.round(120 + r() * 24);
+  }
+  // ---- seeded per-unit events
+  const unitEvents = {}; const kinds = [['Charge complete', 'ok'], ['Charging started', 'info'], ['Charge stopped by timer', 'timer'], ['Ambient vapour filtered, no cut', 'ambient']];
+  Object.values(units).forEach(u => {
+    const list = []; const cnt = 2 + Math.floor(r() * 3);
+    for (let k = 0; k < cnt; k++) { const kk = kinds[Math.floor(r() * (k === 0 ? 2 : kinds.length))]; list.push({ time: startMs - Math.floor((k + 0.3 + r()) * DAY * 1.3), message: kk[0], severity: kk[1], readings: { temp: +(28 + r() * 5).toFixed(1), pod: Math.round(45 + r() * 15), room: Math.round(40 + r() * 15), power: Math.round(r() * 140), relay: 'on' } }); }
+    if (u.state === 'offline') list.unshift({ time: startMs - (u.id === 207 ? 6600000 : 3000000), message: 'Device offline (Wi-Fi lost)', severity: 'info', readings: null });
+    unitEvents[u.id] = list.sort((a, b) => b.time - a.time);
+  });
+  // ---- manager feed seed
+  const m = 60000;
+  const feed = [
+    { time: startMs - 6 * m, unit: 112, severity: 'ok', message: 'Unit 112 · Charge complete' },
+    { time: startMs - 19 * m, unit: 503, severity: 'ambient', message: 'Unit 503 · Ambient vapour filtered, no cut' },
+    { time: startMs - 32 * m, unit: 216, severity: 'timer', message: 'Unit 216 · Charge stopped by timer' },
+    { time: startMs - 50 * m, unit: 415, severity: 'info', message: 'Unit 415 · Device offline' },
+    { time: startMs - 110 * m, unit: 207, severity: 'info', message: 'Unit 207 · Device offline' },
+    { time: startMs - 140 * m, unit: 308, severity: 'ok', message: 'Unit 308 · Charge complete' }
+  ];
+  return { sessions, trend, tenantAlerts, units, unitEvents, feed };
+}
+
+function initialState() {
+  RNG.sim = mulberry32(304);
+  RNG.bld = mulberry32(4820);
+  const start = demoStart();
+  const seed = buildSeed(mulberry32(2026), start);
+  const s = {
+    simMs: start, startMs: start, accum: 0, tick: 0, speedIdx: CONFIG.defaultSpeedIdx, paused: false,
+    u: {
+      relay: 'off', charging: false, batteryPct: CONFIG.startPct, batteryTempC: 22.3, podVoc: 50, roomVoc: 45, powerW: 0, voltage: 120.0,
+      sessionStart: null, timerLimitH: CONFIG.timerDefaultH, systemState: 'idle',
+      alert: null, lastAlert: null, acknowledged: false, warningActive: false, ambientActive: false, timerStopped: false, timerInfo: null,
+      cnt: { heat: 0, voc: 0, cur: 0 }, vocRiseAt: null, heatRiseAt: null, slowDecay: 0, testCut: false, relayBefore: 'off'
+    },
+    scenario: null,
+    hist: [], log: [], seq: 0,
+    kpi: { alertsMonth: 1, ambientFiltered: 7, avgCharge: '2.4 h' },
+    units: seed.units, feed: seed.feed, sessions: seed.sessions, trend: seed.trend,
+    tenantAlerts: seed.tenantAlerts, unitEvents: seed.unitEvents,
+    settings: { push: true, sms: true, share: true, monitoring: false },
+    paired: false,
+    script: { running: false, paused: false, t: 0, idx: 0, finished: false }
+  };
+  for (let i = 0; i < CONFIG.histLen; i++) s.hist.push({ temp: 22.3 + (RNG.sim() - 0.5) * 0.3, pod: 50 + (RNG.sim() - 0.5) * 8, room: 45 + (RNG.sim() - 0.5) * 8, power: 0 });
+  return s;
+}
+const speed = () => CONFIG.speeds[S.speedIdx];
+
+/* =====================================================================
+   EVENT BUS
+   ===================================================================== */
+const Bus = {
+  subs: {},
+  on(ch, fn) { (this.subs[ch] || (this.subs[ch] = [])).push(fn); },
+  emit(ch, p) { (this.subs[ch] || []).forEach(fn => { try { fn(p); } catch (e) { logError(e); } }); }
+};
+function readings() { const u = S.u; return { temp: +u.batteryTempC.toFixed(1), pod: Math.round(u.podVoc), room: Math.round(u.roomVoc), power: Math.round(u.powerW), relay: u.relay }; }
+function emit(ev) {
+  const e = Object.assign({ id: ++S.seq, time: S.simMs, unit: 304, severity: 'info', readings: readings(), notify: false, action: '' }, ev);
+  S.log.push(e);
+  Bus.emit('event', e);
+  return e;
+}
+
+/* =====================================================================
+   SIMULATION ENGINE
+   ===================================================================== */
+function expectedPower(pct) {
+  if (pct < CONFIG.taperStart) return CONFIG.powerNominal;
+  return CONFIG.powerNominal - (CONFIG.powerNominal - CONFIG.powerMin) * clamp((pct - CONFIG.taperStart) / (100 - CONFIG.taperStart), 0, 1);
+}
+function isLive() { const u = S.u; return u.relay === 'on' && u.charging && !u.testCut; }
+const nz = r => (RNG.sim() * 2 - 1) * r;
+
+function step() {
+  const u = S.u, B = CONFIG.base;
+  const sc = S.scenario;
+  if (sc) sc.t += 1;
+  const live = isLive();
+  // battery + power
+  if (live) u.batteryPct = Math.min(100, u.batteryPct + CONFIG.chargeRate);
+  const exp = live ? expectedPower(u.batteryPct) : 0;
+  let p = live ? exp + nz(1.5) : 0;
+  if (live && sc && sc.type === 'fault') p = CONFIG.faultPowerW + nz(3);
+  u.powerW = Math.max(0, p);
+  u.voltage = 120 + nz(0.6);
+  // temperature
+  const load = Math.min(u.powerW / CONFIG.powerNominal, 1.6);
+  if (sc && sc.type === 'heat') {
+    u.batteryTempC = sc.t <= sc.ramp ? sc.t0 + (sc.peak - sc.t0) * sc.t / sc.ramp + nz(0.1) : sc.peak + nz(0.15);
+    if (sc.t >= sc.ramp + sc.hold) S.scenario = null;
+  } else {
+    let tT = B.temp + CONFIG.tempLoadGain * load;
+    if (sc && sc.type === 'offgas') tT += 6 * clamp(sc.t / sc.ramp, 0, 1);
+    u.batteryTempC += (tT - u.batteryTempC) * CONFIG.tempK + nz(0.15);
+  }
+  // VOC
+  const slow = u.slowDecay > 0; if (slow) u.slowDecay--;
+  const podK = slow ? CONFIG.vocSlowK : CONFIG.podK, roomK = slow ? CONFIG.vocSlowK : CONFIG.roomK;
+  if (sc && sc.type === 'cooking') {
+    const rr = sc.rise * 0.8;
+    u.roomVoc = sc.t < rr ? sc.r0 + (sc.roomPeak - sc.r0) * sc.t / rr + nz(3) : sc.roomPeak + nz(5);
+    u.podVoc = sc.t < sc.rise ? sc.p0 + (sc.podPeak - sc.p0) * sc.t / sc.rise + nz(3) : sc.podPeak + nz(5);
+    if (sc.t >= sc.rise + sc.hold) S.scenario = null;
+  } else if (sc && sc.type === 'offgas') {
+    u.podVoc = sc.t < sc.ramp ? sc.p0 + (sc.peak - sc.p0) * sc.t / sc.ramp + nz(3) : sc.peak + nz(4);
+    u.roomVoc += (B.roomVoc - u.roomVoc) * roomK + nz(3);
+  } else {
+    u.podVoc += (B.podVoc - u.podVoc) * podK + nz(4);
+    u.roomVoc += (B.roomVoc - u.roomVoc) * roomK + nz(4);
+  }
+  u.podVoc = clamp(u.podVoc, 0, 500); u.roomVoc = clamp(u.roomVoc, 0, 500);
+  S.hist.push({ temp: u.batteryTempC, pod: u.podVoc, room: u.roomVoc, power: u.powerW });
+  if (S.hist.length > CONFIG.histLen) S.hist.shift();
+  if (live && u.batteryPct >= 100) chargeComplete();
+  detect();
+  updateSystemState();
+}
+
+function detect() {
+  const u = S.u, C = CONFIG;
+  if (u.alert || u.acknowledged) { u.cnt.heat = u.cnt.voc = u.cnt.cur = 0; return; }
+  const live = isLive();
+  if (u.podVoc > C.vocRise) { if (!u.vocRiseAt) u.vocRiseAt = S.simMs; } else if (u.podVoc < C.vocRise - 25) u.vocRiseAt = null;
+  if (u.batteryTempC > C.heatWarnC) { if (!u.heatRiseAt) u.heatRiseAt = S.simMs; } else u.heatRiseAt = null;
+  u.cnt.heat = u.batteryTempC > C.heatWarnC ? u.cnt.heat + 1 : 0;
+  u.cnt.voc = (u.podVoc > C.vocAlert && u.roomVoc < C.roomNormalMax) ? u.cnt.voc + 1 : 0;
+  u.cnt.cur = (live && u.powerW > C.currentFactor * expectedPower(u.batteryPct)) ? u.cnt.cur + 1 : 0;
+  if (u.batteryTempC > C.criticalC) return triggerAlert('heat');
+  if (u.cnt.voc >= C.vocAlertHoldS) return triggerAlert('offgas');
+  if (u.cnt.cur >= C.currentHoldS) return triggerAlert('electrical');
+  if (live && u.sessionStart != null && (S.simMs - u.sessionStart) >= u.timerLimitH * 3600000) return timerStop();
+  // ambient filter: pod and room air rise together
+  const amb = u.podVoc > C.vocAlert && u.roomVoc > C.roomAmbientMin;
+  if (amb && !u.ambientActive) {
+    u.ambientActive = true; S.kpi.ambientFiltered++;
+    updateSystemState();
+    emit({ type: 'ambient', severity: 'ambient', title: 'Room vapour detected', message: 'Unit 304 · Room vapour detected, likely cooking. Monitoring, no cut.', notify: true, action: 'No action (ambient filter)' });
+  } else if (u.ambientActive && u.podVoc < C.vocClear) {
+    u.ambientActive = false; updateSystemState();
+    emit({ type: 'normal', severity: 'ok', message: 'Unit 304 · Room air back to normal. Charging continues.' });
+  }
+  if (u.cnt.heat >= C.heatWarnHoldS && !u.warningActive) {
+    u.warningActive = true; updateSystemState();
+    emit({ type: 'warning', severity: 'warning', title: 'Battery running warm', message: `Unit 304 · Battery running warm (${u.batteryTempC.toFixed(1)} °C)`, notify: true, action: 'Monitoring closely' });
+  } else if (u.warningActive && u.batteryTempC < C.heatClearC) {
+    u.warningActive = false; updateSystemState();
+    emit({ type: 'normal', severity: 'ok', message: 'Unit 304 · Battery temperature back to normal' });
+  }
+}
+
+function deriveState() {
+  const u = S.u;
+  if (u.alert) return 'alert';
+  if (u.acknowledged) return 'acknowledged';
+  if (u.timerStopped) return 'timerStop';
+  if (u.ambientActive) return 'ambient';
+  if (u.warningActive) return 'warning';
+  if (u.charging && (u.relay === 'on' || u.testCut)) return 'charging';
+  return 'idle';
+}
+function updateSystemState() {
+  const n = deriveState(), o = S.u.systemState;
+  if (n !== o) { S.u.systemState = n; Bus.emit('state', { from: o, to: n }); }
+}
+
+function triggerAlert(kind) {
+  const u = S.u, t0 = S.simMs;
+  const snap = readings();
+  const rising = kind === 'offgas' ? (u.vocRiseAt || t0 - 6000) : kind === 'heat' ? (u.heatRiseAt || t0 - 5000) : t0 - CONFIG.currentHoldS * 1000;
+  u.relay = 'cut'; u.charging = false; u.testCut = false;
+  u.alert = { kind, t0, risingAt: rising, readings: snap, monitoring: S.settings.monitoring, ack: null };
+  u.sessionStart = null; u.warningActive = false; u.ambientActive = false; u.timerStopped = false;
+  u.cnt = { heat: 0, voc: 0, cur: 0 }; S.scenario = null; u.slowDecay = CONFIG.slowDecayS; u.powerW = 0;
+  S.kpi.alertsMonth++;
+  updateSystemState();
+  const A = STRINGS.alerts[kind];
+  emit({ type: 'alert', kind, severity: 'alert', title: A.title, message: A.ticker, notify: true, action: 'Relay cut in 0.8 s', readings: snap });
+  emit({ type: 'cut', severity: 'alert', time: t0 + 800, message: 'Unit 304 · Smart Plug cut power (0.8 s)', action: 'Relay cut', readings: snap });
+  emit({ type: 'notify_mgr', severity: 'info', time: t0 + 1000, message: 'Unit 304 · Tenant and building manager notified', action: 'Dual alert sent', readings: snap });
+  if (S.settings.monitoring) emit({ type: 'monitoring', severity: 'info', time: t0 + 1000, message: 'Unit 304 · Alarm monitoring centre notified', action: 'Monitoring notified', readings: snap });
+}
+
+function startCharge() {
+  const u = S.u;
+  if (u.alert) acknowledge('tenant', true);
+  u.acknowledged = false; u.timerStopped = false; u.timerInfo = null;
+  if (u.batteryPct >= 99.5) u.batteryPct = CONFIG.startPct;
+  u.relay = 'on'; u.charging = true; u.testCut = false; u.sessionStart = S.simMs; u.cnt = { heat: 0, voc: 0, cur: 0 };
+  updateSystemState();
+  emit({ type: 'charge_start', severity: 'ok', message: 'Unit 304 · Charging started', action: 'Relay on' });
+}
+function stopCharge() {
+  const u = S.u; u.relay = 'off'; u.charging = false; u.sessionStart = null; u.testCut = false;
+  u.warningActive = false; S.scenario = null;
+  updateSystemState();
+  emit({ type: 'charge_stop', severity: 'info', message: 'Unit 304 · Charging stopped by tenant', action: 'Relay off' });
+}
+function chargeComplete() {
+  const u = S.u; u.relay = 'off'; u.charging = false; u.sessionStart = null;
+  updateSystemState();
+  emit({ type: 'complete', severity: 'ok', title: 'Charge complete', message: 'Unit 304 · Charge complete (100%)', notify: true, action: 'Relay off' });
+}
+function timerStop() {
+  const u = S.u; const h = u.timerLimitH;
+  u.relay = 'cut'; u.charging = false; u.timerStopped = true; u.timerInfo = { t: S.simMs, h }; u.sessionStart = null; S.scenario = null;
+  updateSystemState();
+  emit({ type: 'timer', severity: 'timer', title: 'Charge stopped by timer', message: `Unit 304 · Charge stopped by timer after ${h} h`, notify: true, action: 'Relay cut (timer)' });
+}
+function acknowledge(by, silent) {
+  const u = S.u;
+  if (!u.alert) return false;
+  u.alert.ack = { by, t: S.simMs };
+  u.lastAlert = u.alert; u.alert = null; u.acknowledged = true; S.scenario = null;
+  S.tenantAlerts.forEach(a => { if (a.live && !a.resolved) { a.resolved = true; if (by === 'tenant') a.read = true; } });
+  updateSystemState();
+  if (!silent) emit({ type: 'ack', severity: 'ok', by, title: by === 'tenant' ? 'Tenant confirmed safe' : 'Alert acknowledged', message: by === 'tenant' ? 'Unit 304 · Tenant confirmed safe' : 'Unit 304 · Alert acknowledged by building manager', notify: by === 'manager', action: by === 'tenant' ? 'Tenant acknowledged' : 'Manager acknowledged' });
+  return true;
+}
+function testCut() {
+  const u = S.u; if (u.alert || u.testCut) return;
+  u.relayBefore = u.relay; u.testCut = true; u.relay = 'cut';
+  emit({ type: 'test_cut', severity: 'info', message: 'Unit 304 · Test cut-off started (3 s)', action: 'Relay cut (test)' });
+  later(() => {
+    if (!S.u.testCut) return;
+    S.u.testCut = false; S.u.relay = S.u.relayBefore;
+    emit({ type: 'test_done', severity: 'ok', message: 'Unit 304 · Test cut-off passed, power restored', action: 'Relay restored' });
+    renderPhone(); renderLive();
+  }, CONFIG.testCutMs);
+  renderPhone(); renderLive();
+}
+function ensureCharging() {
+  const u = S.u;
+  if (u.alert) { acknowledge('manager', true); hideBanner(); closeAlertOverlay(); }
+  if (!isLive() && !u.testCut) startCharge();
+}
+function startScenario(type, params = {}) {
+  const u = S.u;
+  ensureCharging();
+  const sc = { type, t: 0 };
+  if (type === 'heat') Object.assign(sc, { ramp: 30, peak: 48, hold: 40, t0: u.batteryTempC });
+  if (type === 'cooking') Object.assign(sc, { rise: 10, hold: 25, podPeak: 300, roomPeak: 310, p0: u.podVoc, r0: u.roomVoc });
+  if (type === 'offgas') Object.assign(sc, { ramp: 20, peak: 380, p0: u.podVoc });
+  Object.assign(sc, params);
+  if (type === 'timer') { u.sessionStart = S.simMs - u.timerLimitH * 3600000; renderLive(); return; }
+  S.scenario = sc;
+}
+function resolveActive() {
+  const u = S.u;
+  if (!acknowledge('manager')) {
+    S.scenario = null;
+    if (u.warningActive || u.ambientActive) {
+      u.warningActive = false; u.ambientActive = false;
+      u.batteryTempC = Math.min(u.batteryTempC, 33); u.podVoc = 55; u.roomVoc = 48; u.cnt = { heat: 0, voc: 0, cur: 0 };
+      updateSystemState();
+      emit({ type: 'normal', severity: 'ok', message: 'Unit 304 · Status cleared, readings normal' });
+    }
+  }
+  hideBanner(); closeAlertOverlay(); renderPhone();
+}
+
+/* ---------- Building background simulation ---------- */
+function buildingTick() {
+  if (S.tick % 16 === 0) {
+    Object.values(S.units).forEach(b => {
+      if (b.id === 304 || b.state !== 'charging') return;
+      b.temp = +clamp(b.temp + (RNG.bld() - 0.5) * 0.6, 26, 33).toFixed(1);
+      b.power = Math.round(clamp(b.power + (RNG.bld() - 0.5) * 6, 110, 146));
+      b.voc = Math.round(clamp(b.voc + (RNG.bld() - 0.5) * 6, 38, 62));
+      b.pct = Math.min(99, b.pct + 1);
+    });
+  }
+  if (S.tick % 48 === 24) {
+    const others = Object.values(S.units).filter(b => b.id !== 304 && b.state !== 'offline');
+    const ch = others.filter(b => b.state === 'charging'), idle = others.filter(b => b.state === 'idle');
+    let start = RNG.bld() < 0.5;
+    if (ch.length <= 6) start = true; if (ch.length >= 10) start = false;
+    const pool = start ? idle : ch; const b = pool[Math.floor(RNG.bld() * pool.length)];
+    if (b) {
+      if (start) { b.state = 'charging'; b.temp = 24.5; b.power = 138; addFeed({ time: S.simMs, unit: b.id, severity: 'info', message: `Unit ${b.id} · Charging started` }); }
+      else { b.state = 'idle'; b.power = 0; b.temp = 23.5; addFeed({ time: S.simMs, unit: b.id, severity: 'ok', message: `Unit ${b.id} · Charge complete` }); }
+      S.unitEvents[b.id].unshift({ time: S.simMs, message: start ? 'Charging started' : 'Charge complete', severity: start ? 'info' : 'ok', readings: { temp: b.temp, pod: b.voc, room: 44, power: b.power, relay: start ? 'on' : 'off' } });
+      renderGrid(); renderKpis();
+    }
+  }
+}
+
+/* ---------- Main loop ---------- */
+function tick() {
+  try {
+    if (!S.paused) {
+      scriptTick();
+      S.tick++;
+      S.accum += CONFIG.tickMs / 1000 * speed();
+      let n = 0;
+      while (S.accum >= 1 && n < 200) { S.accum -= 1; S.simMs += 1000; step(); n++; }
+      buildingTick();
+    }
+    renderLive();
+  } catch (e) { logError(e); }
+}
+
+/* =====================================================================
+   SOUND (Web Audio, generated)
+   ===================================================================== */
+const Sound = {
+  ctx: null, unlocked: false,
+  unlock() {
+    if (this.unlocked) return;
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      this.ctx = new AC(); if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+      this.unlocked = true; renderSoundChip();
+    } catch (e) { logError(e); }
+  },
+  tone(freq, dur, at, vol = 0.18, type = 'sine') {
+    const c = this.ctx; const t = c.currentTime + at;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = freq;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.setValueAtTime(vol, t + dur - 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination); o.start(t); o.stop(t + dur + 0.02);
+  },
+  play(kind) {
+    if (!UI.soundOn || !this.unlocked || !this.ctx) return;
+    try {
+      if (kind === 'info') this.tone(880, 0.12, 0, 0.14);
+      else if (kind === 'warning') { this.tone(660, 0.16, 0, 0.16); this.tone(880, 0.16, 0.2, 0.16); }
+      else if (kind === 'alert') { for (let r = 0; r < 2; r++) for (let i = 0; i < 3; i++) this.tone(1000, 0.15, r * 1.0 + i * 0.25, 0.2, 'square'); }
+    } catch (e) { logError(e); }
+  }
+};
+function renderSoundChip() {
+  const el = $('#soundHint');
+  if (!Sound.unlocked) { el.innerHTML = icon('sound', 15) + 'Click to enable sound'; el.style.display = ''; el.setAttribute('aria-label', 'Click to enable sound'); }
+  else { el.innerHTML = icon(UI.soundOn ? 'sound' : 'mute', 15) + (UI.soundOn ? 'Sound on' : 'Sound off'); el.setAttribute('aria-label', UI.soundOn ? 'Sound on, click to mute (M)' : 'Sound off, click to unmute (M)'); }
+}
+function toggleSound() { UI.soundOn = !UI.soundOn; renderSoundChip(); renderPresenter(); }
+
+/* =====================================================================
+   PHONE UI
+   ===================================================================== */
+function statusIcons() {
+  return `<svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true"><rect x="0" y="8" width="3" height="4" rx="1" fill="currentColor"/><rect x="5" y="5.5" width="3" height="6.5" rx="1" fill="currentColor"/><rect x="10" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="15" y="0" width="3" height="12" rx="1" fill="currentColor"/></svg>
+  <svg width="16" height="12" viewBox="0 0 16 12" aria-hidden="true"><path d="M8 11.5 5.6 9a3.4 3.4 0 0 1 4.8 0L8 11.5zM3.4 6.8a6.5 6.5 0 0 1 9.2 0l-1.4 1.4a4.5 4.5 0 0 0-6.4 0L3.4 6.8zM1 4.4a9.9 9.9 0 0 1 14 0l-1.3 1.3a8 8 0 0 0-11.4 0L1 4.4z" fill="currentColor"/></svg>
+  <svg width="27" height="13" viewBox="0 0 27 13" aria-hidden="true"><rect x=".5" y=".5" width="23" height="12" rx="3.5" fill="none" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="16" height="9" rx="2" fill="currentColor"/><rect x="24.5" y="4.5" width="2" height="4" rx="1" fill="currentColor" opacity=".45"/></svg>`;
+}
+function currentScreen() { return UI.stack.length ? UI.stack[UI.stack.length - 1] : { name: UI.tab }; }
+function nav(name, arg) { clearPairTimers(); UI.stack.push({ name, arg }); renderPhone(false); }
+function back() { clearPairTimers(); UI.stack.pop(); renderPhone(false); }
+function setTab(t) { clearPairTimers(); UI.tab = t; UI.stack = []; renderPhone(false); }
+function clearPairTimers() { UI.pairTimers.forEach(clearLater); UI.pairTimers = []; }
+function unreadCount() { return S.tenantAlerts.filter(a => !a.read).length; }
+
+function renderTabbar() {
+  const tabs = [['home', 'Home', 'home'], ['history', 'History', 'clock'], ['alerts', 'Alerts', 'bell'], ['settings', 'Settings', 'gear']];
+  const top = currentScreen().name; const active = UI.stack.length ? UI.tab : top;
+  const n = unreadCount();
+  $('#tabbar').innerHTML = tabs.map(([k, l, ic]) => `<button class="tab ${active === k ? 'on' : ''}" data-act="tab" data-arg="${k}" aria-label="${l}${k === 'alerts' && n ? `, ${n} unread` : ''}" ${active === k ? 'aria-current="page"' : ''}>${icon(ic, 24)}<span>${l}</span>${k === 'alerts' && n ? `<span class="badge num">${n}</span>` : ''}</button>`).join('');
+}
+
+function renderPhone(keepScroll = true) {
+  try {
+    const view = $('#pview'); const top = currentScreen(); const key = top.name + ':' + (top.arg || '');
+    const st = (keepScroll && UI.lastScreenKey === key) ? view.scrollTop : 0;
+    const fn = SCREENS[top.name] || SCREENS.home;
+    view.innerHTML = fn(top.arg);
+    view.scrollTop = st; UI.lastScreenKey = key;
+    renderTabbar(); renderOverlay(); phoneLive();
+  } catch (e) { logError(e); }
+}
+
+function heroHTML() {
+  const u = S.u, st = u.systemState, M = STRINGS.states[st];
+  let title = M.title, sub = M.sub;
+  if (st === 'alert') title = STRINGS.alerts[u.alert.kind].hero;
+  if (st === 'warning') sub = 'Battery at <span class="num" data-live="temp"></span> °C. Power still on, watching closely.';
+  if (st === 'charging') sub = 'All sensors normal · <span class="num" data-live="power"></span> W';
+  if (st === 'timerStop' && u.timerInfo) sub = `Stopped at your ${u.timerInfo.h} h limit at ${fmtHM(u.timerInfo.t)}.`;
+  if (st === 'acknowledged' && u.lastAlert && u.lastAlert.ack) sub = u.lastAlert.ack.by === 'tenant' ? "You confirmed you're safe. Power stays off until you restart." : 'Building manager acknowledged. Power stays off until you restart.';
+  const C = 2 * Math.PI * 36;
+  const ringCol = { idle: '#AEB7C0', charging: '#17703D', warning: '#C77C00', ambient: '#C77C00', alert: '#E5484D', timerStop: '#1D4ED8', acknowledged: '#1D4ED8' }[st];
+  const tag = st === 'alert' ? 'button data-act="openAlert" aria-label="Open alert details"' : 'div';
+  return `<${tag} class="hero h-${st} ${st === 'alert' ? 'pulse' : ''}">
+    <div class="hero-ic">${icon(M.icon, 28)}</div>
+    <div class="hero-txt"><div class="hero-state">${icon(M.icon, 13)} ${esc(M.label)}</div><div class="hero-title">${esc(title)}</div><div class="hero-s">${sub}</div></div>
+    <div class="ring" aria-label="Battery level"><svg width="84" height="84" viewBox="0 0 84 84"><circle cx="42" cy="42" r="36" fill="none" stroke="rgba(0,0,0,.08)" stroke-width="8"/><circle class="arc" data-ring cx="42" cy="42" r="36" fill="none" stroke="${ringCol}" stroke-width="8" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}"/></svg><div class="ring-v"><b class="num"><span data-live="pct"></span>%</b><span>BATTERY</span></div></div>
+  </${tag.split(' ')[0]}>`;
+}
+function sparkSvg(key, color) { return `<svg class="spark" data-spark="${key}" viewBox="0 0 100 28" preserveAspectRatio="none" aria-hidden="true"><polyline stroke="${color}" points=""/></svg>`; }
+
+const SCREENS = {
+  home() {
+    const u = S.u, st = u.systemState;
+    let btn;
+    if (st === 'alert') btn = `<button class="btn btn-red" data-act="openAlert">${icon('shieldX', 20)} View alert</button>`;
+    else if (u.charging && u.relay !== 'off') btn = `<button class="btn btn-outline" data-act="stopCharge">${icon('power', 20)} Stop charge</button>`;
+    else btn = `<button class="btn btn-dark" data-act="startCharge">${icon('bolt', 20)} Start charge</button>`;
+    return `
+    <div class="p-top"><div><div class="p-greet">Good evening, ${STRINGS.tenant.first}</div><div class="p-sub">${STRINGS.tenant.unit} · ${STRINGS.tenant.address}</div></div><div class="avatar" aria-hidden="true">${STRINGS.tenant.initials}</div></div>
+    ${heroHTML()}
+    <div class="tiles">
+      <div class="tile" data-tone="temp"><div class="tile-l">${icon('thermo', 13)} Battery temp</div><div class="tile-v num"><span data-live="temp"></span><small>°C</small></div>${sparkSvg('temp', '#C77C00')}</div>
+      <div class="tile" data-tone="voc"><div class="tile-l">${icon('vapor', 13)} Off-gas</div><div class="tile-v num"><span data-live="voc"></span><small>VOC</small></div>${sparkSvg('pod', '#7C3AED')}</div>
+      <div class="tile" data-tone="power"><div class="tile-l">${icon('bolt', 13)} Power</div><div class="tile-v num"><span data-live="power"></span><small>W</small></div>${sparkSvg('power', '#1D4ED8')}</div>
+    </div>
+    <div class="pcard"><div class="srow">
+      <div><div class="k">Started</div><div class="v num" data-live="started"></div></div>
+      <div><div class="k">Elapsed</div><div class="v num" data-live="elapsedShort"></div></div>
+      <div><div class="k">Est. full</div><div class="v num" data-live="estFull"></div></div>
+      <div><div class="k">Timer limit</div><div class="v num" data-live="timer"></div></div>
+    </div></div>
+    ${btn}
+    <div class="h-sec">Devices</div>
+    <div class="devs">
+      <button class="dev" data-act="device" data-arg="plug" aria-label="Smart Plug details"><span class="dev-top">${icon('plug', 18)}<span class="online" aria-hidden="true"></span></span>Smart Plug<span class="dev-meta">${icon('wifi', 12)} Online</span></button>
+      <button class="dev" data-act="device" data-arg="pod" aria-label="Sensor Pod details"><span class="dev-top">${icon('pod', 18)}<span class="online" aria-hidden="true"></span></span>Sensor Pod<span class="dev-meta">87% battery</span></button>
+      <button class="dev" data-act="device" data-arg="box" aria-label="Containment Box details"><span class="dev-top">${icon('box', 18)}<span class="online" aria-hidden="true"></span></span>Containment<span class="dev-meta">${icon('check', 12)} Lid closed</span></button>
+    </div>
+    <div class="note">${STRINGS.tenant.battery}</div>`;
+  },
+  device(kind) {
+    const head = t => `<div class="p-back"><button data-act="back" aria-label="Back">${icon('chevL', 22)}Back</button><h2>${t}</h2></div>`;
+    if (kind === 'plug') return head('Smart Plug') + `
+      <div class="big-ill">${plugIllustration()}</div>
+      <div class="list">
+        <div class="kv"><span class="k">Relay</span><span class="v num" data-live="relayFull"></span></div>
+        <div class="kv"><span class="k">Live current</span><span class="v num"><span data-live="power"></span> W · <span data-live="amps"></span> A</span></div>
+        <div class="kv"><span class="k">Voltage</span><span class="v num"><span data-live="volt"></span> V</span></div>
+        <div class="kv"><span class="k">Charge timer</span><span class="v num" data-live="timer"></span></div>
+        <div class="kv"><span class="k">Room-air VOC (reference)</span><span class="v num" data-live="room"></span></div>
+        <div class="kv"><span class="k">Firmware</span><span class="v">v0.9 prototype</span></div>
+      </div>
+      <button class="btn btn-light" data-act="testCut" ${S.u.alert || S.u.testCut ? 'disabled' : ''}>${icon('power', 20)} ${S.u.testCut ? 'Testing… power off for 3 s' : 'Test cut-off'}</button>
+      <div class="note">Test cut-off switches power off for 3 seconds, then restores it. The test is logged.</div>`;
+    if (kind === 'pod') return head('Sensor Pod') + `
+      <div class="big-ill">${podIllustration()}</div>
+      <div class="list">
+        <div class="kv"><span class="k">Battery temperature</span><span class="v num"><span data-live="temp"></span> °C</span></div>
+        <div class="kv"><span class="k">Off-gas (VOC index)</span><span class="v num" data-live="voc"></span></div>
+        <div class="kv"><span class="k">Pod battery</span><span class="v">87%</span></div>
+        <div class="kv"><span class="k">Last calibration</span><span class="v">${fmtDay(S.startMs - 9 * 86400000)}</span></div>
+        <div class="kv"><span class="k">Signal strength</span><span class="v">Strong · −52 dBm</span></div>
+      </div>`;
+    return head('Containment Box') + `
+      <div class="big-ill">${boxIllustration()}</div>
+      <div class="list">
+        <div class="kv"><span class="k">Battery inside</span><span class="v">${icon('check', 16)} Yes</span></div>
+        <div class="kv"><span class="k">Lid closed</span><span class="v">${icon('check', 16)} Yes</span></div>
+        <div class="kv"><span class="k">Suppressant</span><span class="v">${icon('check', 16)} Ready</span></div>
+      </div>
+      <div class="note">The suppressant activates on its own if flame is detected inside the box.</div>`;
+  },
+  history() {
+    const wk = UI.histWeek;
+    const days = S.sessions.slice(wk * 7, wk * 7 + 7).slice().reverse();
+    const maxH = 6.5, W = 340, H = 130, bw = 30, gap = (W - 7 * bw) / 6;
+    const colr = { normal: '#2ECC71', timer: '#3B82F6', ambient: '#F5A623', cut: '#E5484D' };
+    const bars = days.map((s, i) => { const h = Math.max(6, s.durH / maxH * (H - 24)); const x = i * (bw + gap); return `<rect x="${x.toFixed(1)}" y="${(H - 18 - h).toFixed(1)}" width="${bw}" height="${h.toFixed(1)}" rx="6" fill="${colr[s.result]}"/><text x="${(x + bw / 2).toFixed(1)}" y="${H - 3}" font-size="11" text-anchor="middle" fill="#5B6670">${fmtDayShort(s.start)}</text><text x="${(x + bw / 2).toFixed(1)}" y="${(H - 22 - h).toFixed(1)}" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="700">${s.durH.toFixed(1)}h</text>`; }).join('');
+    const tr = S.trend, tmin = 29, tmax = 35, TW = 320, TH = 84;
+    const pts = tr.map((p, i) => [26 + i * (TW - 52) / 5, 16 + (tmax - p.v) / (tmax - tmin) * (TH - 32)]);
+    const trendSvg = `<svg width="100%" viewBox="0 0 ${TW} ${TH}" aria-label="Weekly peak battery temperature, 6 weeks"><polyline points="${pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="#C77C00" stroke-width="2.5" stroke-linejoin="round"/>${pts.map((p, i) => `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5" fill="#fff" stroke="#C77C00" stroke-width="2"/><text x="${p[0].toFixed(1)}" y="${(p[1] - 8).toFixed(1)}" font-size="10" text-anchor="middle" fill="#1A1A1A" font-weight="700">${tr[i].v.toFixed(1)}</text><text x="${p[0].toFixed(1)}" y="${TH - 2}" font-size="10" text-anchor="middle" fill="#5B6670">${i === 5 ? 'This wk' : (5 - i) + 'w ago'}</text>`).join('')}</svg>`;
+    const list = S.sessions.slice(wk * 7, wk * 7 + 7).map(s => { const r = STRINGS.results[s.result]; return `<div class="li"><div class="li-ic" style="background:${colr[s.result] === '#2ECC71' ? '#17703D' : colr[s.result] === '#F5A623' ? '#C77C00' : colr[s.result]}">${icon(s.result === 'timer' ? 'timer' : s.result === 'ambient' ? 'vapor' : 'bolt', 18)}</div><div class="grow"><div class="t">${fmtDay(s.start)}</div><div class="d num">${fmtHM(s.start)} · ${s.durH.toFixed(1)} h · max ${s.maxT.toFixed(1)} °C</div></div><span class="rchip ${r[1]}">${r[0]}</span></div>`; }).join('');
+    return `<div class="p-title">History</div>
+      <div class="seg" role="tablist"><button class="${wk === 0 ? 'on' : ''}" data-act="histWeek" data-arg="0" role="tab" aria-selected="${wk === 0}">This week</button><button class="${wk === 1 ? 'on' : ''}" data-act="histWeek" data-arg="1" role="tab" aria-selected="${wk === 1}">Last week</button></div>
+      <div class="pcard" style="margin-top:0"><div class="tile-l" style="margin-bottom:8px">${icon('chart', 13)} Charge sessions (hours)</div><svg width="100%" viewBox="0 0 ${W} ${H}" aria-label="Charge sessions bar chart">${bars}</svg>
+      <div class="legend" style="margin-top:6px"><span><i class="lg" style="background:#2ECC71;border-color:#2ECC71"></i>Normal</span><span><i class="lg" style="background:#3B82F6;border-color:#3B82F6"></i>Timer stop</span><span><i class="lg" style="background:#F5A623;border-color:#F5A623"></i>Ambient ignored</span></div></div>
+      <div class="trend-card"><div class="tile-l" style="color:var(--amber-ink)">${icon('thermo', 13)} Heat trend · early warning</div><div style="font-size:15px;font-weight:700;margin:6px 0 8px;line-height:1.35">Your battery peaked <b>4 °C higher</b> this week than 5 weeks ago.</div>${trendSvg}<div class="p-sub" style="margin-top:6px">Slow heating can mean an ageing pack. Consider a battery check.</div></div>
+      <div class="h-sec">Sessions</div><div class="list">${list}</div>`;
+  },
+  alerts() {
+    const sevCol = { alert: '#E5484D', warning: '#C77C00', ambient: '#C77C00', timer: '#1D4ED8', ok: '#17703D', info: '#1D4ED8' };
+    const ic = { alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer', ok: 'check', info: 'info' };
+    const items = S.tenantAlerts.map(a => `<button class="li ${a.read ? '' : 'unread'}" data-act="alertItem" data-arg="${a.id}"><div class="li-ic" style="background:${sevCol[a.sev]}">${icon(ic[a.sev] || 'info', 18)}</div><div class="grow"><div class="t">${esc(a.title)}</div><div class="d">${esc(a.detail)}</div></div><div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="when num">${sameDay(a.time) ? fmtHM(a.time) : fmtDay(a.time)}</span>${a.read ? (a.resolved ? '<span class="rchip t-green">Resolved</span>' : '<span class="rchip t-red">Active</span>') : '<span class="unread-dot" aria-label="Unread"></span>'}</div></button>`).join('');
+    return `<div class="p-title">Alerts</div><div class="list">${items || '<div class="li">No alerts yet</div>'}</div><div class="note">Alerts are shared with your building manager.</div>`;
+  },
+  alertDetail(id) {
+    const a = S.tenantAlerts.find(x => x.id === id); if (!a) return SCREENS.alerts();
+    const sevCol = { alert: '#E5484D', warning: '#C77C00', ambient: '#C77C00', timer: '#1D4ED8' }[a.sev] || '#1D4ED8';
+    const ic = { alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer' }[a.sev] || 'info';
+    const tl = a.alertObj ? timelineHTML(a.alertObj, true) : '';
+    return `<div class="p-back"><button data-act="back" aria-label="Back">${icon('chevL', 22)}Alerts</button><h2>Alert</h2></div>
+      <div style="background:${sevCol};color:#fff;border-radius:22px;padding:22px 18px;text-align:center">
+        <div class="as-icon" style="width:64px;height:64px">${icon(ic, 34)}</div>
+        <div style="font-size:22px;font-weight:800">${esc(a.title)}</div>
+        <div style="font-size:14px;margin-top:6px;opacity:.95">${esc(a.detail)}</div>
+        <div style="font-size:13px;margin-top:8px;opacity:.9" class="num">${fmtDay(a.time)} · ${fmtHMS(a.time)}</div>
+        ${tl}
+      </div>
+      <div class="list" style="margin-top:12px">
+        ${a.readings ? `<div class="kv"><span class="k">Battery temp at the time</span><span class="v num">${a.readings.temp} °C</span></div><div class="kv"><span class="k">Off-gas / room air VOC</span><span class="v num">${a.readings.pod} / ${a.readings.room}</span></div>` : ''}
+        <div class="kv"><span class="k">Status</span><span class="v">${a.resolved ? '<span class="rchip t-green">Resolved</span>' : '<span class="rchip t-red">Active</span>'}</span></div>
+        <div class="kv"><span class="k">Shared with building manager</span><span class="v">${icon('check', 16)} Yes</span></div>
+      </div>`;
+  },
+  settings() {
+    const st = S.settings, u = S.u;
+    const sw = (k, on, lbl, dis) => `<button class="switch" role="switch" aria-checked="${on}" aria-label="${lbl}" data-act="toggle" data-arg="${k}" ${dis ? 'disabled' : ''}></button>`;
+    return `<div class="p-title">Settings</div>
+      <div class="h-sec" style="margin-top:0">Charging</div>
+      <div class="list"><div class="kv" style="flex-direction:column;align-items:stretch;gap:8px"><div style="display:flex;justify-content:space-between"><span class="k">Charge timer limit</span><span class="v num" id="timerVal">${u.timerLimitH} h</span></div><input class="range" type="range" min="1" max="12" step="1" value="${u.timerLimitH}" data-act="timerRange" aria-label="Charge timer limit in hours"><div class="p-sub">The plug cuts power once a charge runs this long.</div></div></div>
+      <div class="h-sec">Notifications</div>
+      <div class="list">
+        <div class="kv"><span>Push notifications</span>${sw('push', st.push, 'Push notifications')}</div>
+        <div class="kv"><span>SMS backup</span>${sw('sms', st.sms, 'SMS backup')}</div>
+        <div class="kv"><span><span style="display:flex;align-items:center;gap:6px">${icon('lock', 15)} Share alerts with building manager</span><span class="p-sub" style="display:block">Required by your building</span></span>${sw('share', true, 'Share alerts with building manager, locked by building plan', true)}</div>
+        <div class="kv"><span><span>Alarm monitoring service</span><span class="p-sub" style="display:block">${st.monitoring ? 'Alerts also notify the monitoring centre' : 'Off'}</span></span>${sw('monitoring', st.monitoring, 'Alarm monitoring service')}</div>
+      </div>
+      <div class="h-sec">Emergency contacts</div>
+      <div class="list">${STRINGS.contacts.map(c => `<div class="kv"><span><span style="font-weight:700">${c.name}</span><span class="p-sub" style="display:block">${c.rel}</span></span><span class="v num">${c.phone}</span></div>`).join('')}</div>
+      <div class="h-sec">Insurance</div>
+      <div class="pcard" style="margin-top:0"><div style="font-weight:700;font-size:15px">Show your ChargeSentry safety record to your insurer</div><button class="btn btn-light" data-act="sheet" data-arg="insurance">${icon('doc', 18)} View safety summary</button></div>
+      <div class="h-sec">Devices</div>
+      <div class="list"><button class="li" data-act="nav" data-arg="pair"><div class="li-ic" style="background:#1A1A1A">${icon('plus', 18)}</div><div class="grow"><div class="t">Add a device</div><div class="d">Pair a plug or sensor pod</div></div>${icon('chevR', 18)}</button>
+      <button class="li" data-act="device" data-arg="plug"><div class="li-ic" style="background:#5B6670">${icon('plug', 18)}</div><div class="grow"><div class="t">Smart Plug CS-P-0304</div><div class="d">Online</div></div>${icon('chevR', 18)}</button></div>
+      <div class="h-sec">About</div>
+      <div class="list"><div class="kv"><span class="k">Version</span><span class="v">0.9.0 (prototype)</span></div><div class="kv"><span class="k">${STRINGS.about}</span></div></div>`;
+  },
+  pair() {
+    const head = `<div class="p-back"><button data-act="back" aria-label="Back">${icon('chevL', 22)}Settings</button><h2>Add device</h2></div>`;
+    if (!UI.pair) {
+      if (S.paired) return head + `<div class="succ" style="background:var(--blue-ink)">${icon('check', 44)}</div><div style="text-align:center;font-size:22px;font-weight:800">Already paired</div><div class="note" style="font-size:14px">Smart Plug CS-P-0304 and Sensor Pod CS-S-0304 are connected to Unit 304.</div><button class="btn btn-dark" data-act="back">Done</button>`;
+      UI.pair = { step: 1 };
+      schedulePair();
+    }
+    const s = UI.pair.step;
+    const dots = `<div class="steps">${[1, 2, 3].map(i => `<span class="${i <= Math.min(s, 3) ? 'on' : ''}"></span>`).join('')}</div>`;
+    if (s === 1) return head + dots + `<div class="big-ill">${plugIllustration(true)}</div><div style="text-align:center;font-size:22px;font-weight:800">Plug in your ChargeSentry plug</div><div class="note" style="font-size:14px">Use the outlet where you charge your battery. Wait for the light to blink.</div>`;
+    if (s === 2 || s === 2.5) return head + dots + `<div class="search">${s === 2 ? '<i></i><i></i><i></i>' : ''}<div class="core">${icon(s === 2 ? 'wifi' : 'check', 30)}</div></div><div style="text-align:center;font-size:20px;font-weight:800">${s === 2 ? 'Searching for your plug…' : 'Found: ChargeSentry Plug CS-P-0304'}</div><div class="note" style="font-size:14px">${s === 2 ? 'Keep your phone near the plug.' : 'Connected over Wi-Fi.'}</div>`;
+    if (s === 3) return head + dots + `<div class="big-ill">${podIllustration(true)}</div><div style="text-align:center;font-size:22px;font-weight:800">Clip the Sensor Pod beside your battery</div><div class="note" style="font-size:14px">It watches for off-gas and heat right at the battery.</div>`;
+    return head + `<div class="succ">${icon('check', 44)}</div><div style="text-align:center;font-size:22px;font-weight:800">You're protected</div><div class="note" style="font-size:14px">Plug and pod are paired to Unit 304.</div><button class="btn btn-dark" data-act="pairDone">Done</button>`;
+  }
+};
+function sameDay(ms) { return new Date(ms).toDateString() === new Date(S.simMs).toDateString(); }
+function schedulePair() {
+  const seq = [[1600, 2], [3600, 2.5], [4600, 3], [6000, 4]];
+  seq.forEach(([ms, st]) => UI.pairTimers.push(later(() => {
+    if (!UI.pair) return; UI.pair.step = st;
+    if (st === 4) { S.paired = true; emit({ type: 'pair', severity: 'ok', message: 'Unit 304 · Smart Plug CS-P-0304 paired' }); }
+    if (currentScreen().name === 'pair') renderPhone();
+  }, ms)));
+}
+
+function plugIllustration(blink) { return `<svg width="150" height="120" viewBox="0 0 150 120" aria-hidden="true"><rect x="10" y="20" width="40" height="80" rx="8" fill="#F1F3F5" stroke="#CBD3DA"/><rect x="38" y="28" width="86" height="64" rx="16" fill="#fff" stroke="#B9C2CA" stroke-width="2"/><text x="81" y="64" font-size="10" font-weight="800" text-anchor="middle" fill="#1A1A1A">ChargeSentry</text><circle cx="110" cy="40" r="5" fill="#2ECC71">${blink ? '<animate attributeName="opacity" values="1;.2;1" dur="1s" repeatCount="indefinite"/>' : ''}</circle></svg>`; }
+function podIllustration(blink) { return `<svg width="170" height="120" viewBox="0 0 170 120" aria-hidden="true"><rect x="20" y="52" width="130" height="52" rx="10" fill="#39414A"/><text x="85" y="84" font-size="12" font-weight="700" text-anchor="middle" fill="#fff">48 V · 13 Ah</text><rect x="62" y="22" width="48" height="34" rx="11" fill="#fff" stroke="#B9C2CA" stroke-width="2"/><circle cx="98" cy="33" r="4" fill="#2ECC71">${blink ? '<animate attributeName="opacity" values="1;.2;1" dur="1s" repeatCount="indefinite"/>' : ''}</circle><text x="80" y="46" font-size="8" font-weight="800" text-anchor="middle" fill="#1A1A1A">POD</text></svg>`; }
+function boxIllustration() { return `<svg width="170" height="130" viewBox="0 0 170 130" aria-hidden="true"><rect x="14" y="20" width="142" height="100" rx="14" fill="#FAFBFC" stroke="#B9C2CA" stroke-width="3"/><rect x="8" y="12" width="154" height="16" rx="7" fill="#fff" stroke="#B9C2CA" stroke-width="2"/><rect x="34" y="66" width="102" height="40" rx="8" fill="#39414A"/><rect x="66" y="46" width="38" height="24" rx="8" fill="#fff" stroke="#B9C2CA"/><circle cx="96" cy="54" r="3" fill="#2ECC71"/><text x="85" y="24" font-size="8" font-weight="800" text-anchor="middle" fill="#1A1A1A">ChargeSentry</text></svg>`; }
+
+/* ---------- Alert overlay, sheets ---------- */
+function timelineFor(a) {
+  const A = STRINGS.alerts[a.kind], t0 = a.t0;
+  const steps = [
+    { t: a.risingAt, label: A.rising, on: true },
+    { t: t0, label: A.confirm, on: true },
+    { t: t0 + 800, label: 'Plug cut power (0.8 s)', on: true },
+    { t: t0 + 1000, label: 'Building manager notified', on: true },
+    { t: t0 + 1000, label: a.monitoring ? 'Alarm monitoring notified' : 'Alarm monitoring: not enabled', on: a.monitoring }
+  ];
+  if (a.ack) steps.push({ t: a.ack.t, label: a.ack.by === 'tenant' ? 'You confirmed you\'re safe' : 'Building manager acknowledged', on: true });
+  return steps;
+}
+function timelineHTML(a, compact) {
+  return `<div class="tl" ${compact ? 'style="text-align:left"' : ''}>${timelineFor(a).map(s => `<div class="tl-i ${s.on ? '' : 'off'}"><span class="tt num">${fmtHMS(s.t)}</span><span class="tdot">${icon(s.on ? 'check' : 'minus', 12)}</span><span>${esc(s.label)}</span></div>`).join('')}</div>`;
+}
+function openAlertOverlay() { UI.overlay = 'alert'; renderOverlay(); }
+function closeAlertOverlay() { UI.overlay = null; UI.sheet = null; renderOverlay(); }
+function renderOverlay() {
+  const el = $('#poverlay'); const u = S.u;
+  let html = '';
+  if (UI.overlay === 'alert') {
+    const a = u.alert || u.lastAlert;
+    if (a) {
+      const A = STRINGS.alerts[a.kind];
+      if (!a.ack) {
+        html += `<div class="alert-scr" role="alertdialog" aria-label="Power cut automatically">
+          <div class="as-icon pulse">${icon('shieldX', 48)}</div>
+          <div class="as-title">${A.title}</div>
+          <div class="as-sub">${A.cause} Charging stopped at <span class="num">${fmtHMS(a.t0)}</span>.</div>
+          ${timelineHTML(a)}
+          <div class="as-btns">
+            <button class="as-btn white" data-act="imSafe" id="btnSafe">${icon('heart', 22)} I'm safe</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+              <button class="as-btn ghost" data-act="call" data-arg="911">${icon('phone', 20)} Call 911</button>
+              <button class="as-btn ghost" data-act="call" data-arg="mgr" style="font-size:14px">${icon('building', 20)} Call building manager</button>
+            </div>
+          </div>
+          <div class="guide">${icon('info', 16)} ${STRINGS.guidance}</div>
+        </div>`;
+      } else {
+        html += `<div class="alert-scr ack" role="dialog" aria-label="Acknowledged">
+          <div class="as-icon">${icon('shieldCheck', 48)}</div>
+          <div class="as-title">Acknowledged</div>
+          <div class="as-sub">${a.ack.by === 'tenant' ? "You're marked safe. Your building manager can see it." : 'Your building manager acknowledged the alert.'} Power stays off.</div>
+          ${timelineHTML(a)}
+          <div class="guide">${icon('info', 16)} ${STRINGS.guidance}</div>
+          <div class="as-btns"><button class="as-btn white" style="color:var(--green-ink)" data-act="closeAlert">Done</button></div>
+        </div>`;
+      }
+    }
+  }
+  if (UI.sheet) html += sheetHTML(UI.sheet);
+  el.innerHTML = html;
+  el.classList.toggle('show', !!html);
+  const dark = !!html && (UI.overlay === 'alert' || (UI.sheet && UI.sheet.startsWith('call')));
+  $('#statusbar').classList.toggle('dark', dark);
+  $('#homebar').classList.toggle('light', dark);
+}
+function sheetHTML(kind) {
+  if (kind === 'call911' || kind === 'callmgr') {
+    const who = kind === 'call911' ? '911' : STRINGS.building.company;
+    return `<div class="call" role="dialog" aria-label="Simulated call"><div class="avatar" style="width:96px;height:96px;font-size:34px;background:#3A424A">${kind === 'call911' ? icon('phone', 40) : icon('building', 40)}</div><div class="who">${esc(who)}</div><div class="st">${kind === 'call911' ? 'Calling…' : 'Calling ' + STRINGS.building.phone + '…'}</div><div class="simnote">Simulated call. This demo never dials.</div><button class="endcall" data-act="closeSheet" aria-label="End call">${icon('phone', 30)}</button></div>`;
+  }
+  if (kind === 'insurance') {
+    const year = new Date(S.simMs).getFullYear();
+    const live = S.tenantAlerts.filter(a => a.live && a.sev === 'alert');
+    const open = live.some(a => !a.resolved);
+    return `<div class="sheet-wrap" data-act="closeSheet"><div class="sheet" role="dialog" aria-label="Safety summary" data-stop="1"><div class="grab"></div>
+      <div style="display:flex;align-items:center;gap:10px">${logoSvg(34)}<div><div style="font-weight:800;font-size:18px">Safety summary · ${year}</div><div class="p-sub">${STRINGS.tenant.name} · ${STRINGS.tenant.unit}</div></div></div>
+      <div class="list" style="margin-top:14px">
+        <div class="kv"><span class="k">Charge sessions this year</span><span class="v num">${212 + (S.log.some(e => e.type === 'charge_start') ? 1 : 0)}</span></div>
+        <div class="kv"><span class="k">Safety alerts</span><span class="v num">${live.length}</span></div>
+        <div class="kv"><span class="k">Ambient events filtered</span><span class="v num">${2 + S.log.filter(e => e.type === 'ambient').length}</span></div>
+        <div class="kv"><span class="k">Timer stops</span><span class="v num">${1 + S.log.filter(e => e.type === 'timer').length}</span></div>
+        <div class="kv"><span class="k">All alerts resolved</span><span class="v">${open ? '<span class="rchip t-red">1 open</span>' : '<span class="rchip t-green">Yes</span>'}</span></div>
+      </div>
+      <div class="note">Prototype summary from simulated data. Not a certified record.</div>
+      <button class="btn btn-dark" data-act="closeSheet">Close</button></div></div>`;
+  }
+  return '';
+}
+
+/* ---------- Notifications ---------- */
+function showNotif({ title, body, sev, target }) {
+  const el = $('#pnotif');
+  const col = { alert: '#E5484D', warning: '#C77C00', ambient: '#C77C00', timer: '#1D4ED8', ok: '#17703D', info: '#1D4ED8' }[sev] || '#1D4ED8';
+  const ic = { alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer', ok: 'check', info: 'info' }[sev] || 'info';
+  el.innerHTML = `<span class="li-ic" style="background:${col};width:38px;height:38px;border-radius:10px">${icon(ic, 20)}</span><span class="grow"><span class="n-app"><span>ChargeSentry</span><span>now</span></span><span class="n-t" style="display:block">${esc(title)}</span><span class="n-b" style="display:block">${esc(body)}</span></span>`;
+  el.setAttribute('aria-label', 'Notification: ' + title);
+  UI.notifTarget = target;
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearLater(UI.notifT); UI.notifT = later(hideNotif, CONFIG.notifMs);
+}
+function hideNotif() { $('#pnotif').classList.remove('show'); }
+function shakePhone() { const h = $('#phoneHolder'); h.classList.remove('shake'); void h.offsetWidth; h.classList.add('shake'); later(() => h.classList.remove('shake'), 700); }
+
+/* ---------- Live values (shared by all views) ---------- */
+function relayLabel() { const u = S.u; return u.relay === 'on' ? 'ON' : u.relay === 'cut' ? 'CUT' : 'OFF'; }
+function liveValues() {
+  const u = S.u, now = S.simMs;
+  const el = u.sessionStart != null ? (now - u.sessionStart) / 1000 : 0;
+  const est = isLive() ? now + (100 - u.batteryPct) / CONFIG.chargeRate * 1000 : null;
+  const eh = Math.floor(el / 3600), em = Math.floor(el % 3600 / 60);
+  return {
+    clock: fmtHM(now), clockS: fmtHMS(now),
+    temp: u.batteryTempC.toFixed(1), voc: String(Math.round(u.podVoc)), room: String(Math.round(u.roomVoc)),
+    power: String(Math.round(u.powerW)), amps: (u.powerW / u.voltage).toFixed(2), volt: u.voltage.toFixed(1), pct: String(Math.floor(u.batteryPct)),
+    relay: relayLabel(), relayFull: u.testCut ? 'CUT (test)' : u.relay === 'on' ? 'ON · power flowing' : u.relay === 'cut' ? 'CUT · power off' : 'OFF · standby',
+    started: u.sessionStart != null ? fmtHM(u.sessionStart) : '—', elapsed: u.sessionStart != null ? fmtDur(el) : '—',
+    elapsedShort: u.sessionStart != null ? `${eh}:${pad2(em)}` : '—',
+    estFull: est ? fmtHM(est) : '—', timer: u.timerLimitH + ' h',
+    stateLabel: STRINGS.states[u.systemState].title
+  };
+}
+function applyLive(root, vals) {
+  $$('[data-live]', root).forEach(el => { const k = el.getAttribute('data-live'); if (k in vals) setText(el, vals[k]); });
+}
+function sparkPoints(key, n, minSpan) {
+  const h = S.hist.slice(-n); const vals = h.map(x => x[key]);
+  let mn = Math.min(...vals), mx = Math.max(...vals);
+  if (mx - mn < minSpan) { const c = (mx + mn) / 2; mn = c - minSpan / 2; mx = c + minSpan / 2; }
+  return vals.map((v, i) => `${(i / (vals.length - 1) * 100).toFixed(1)},${(26 - (v - mn) / (mx - mn) * 24).toFixed(1)}`).join(' ');
+}
+function phoneLive() {
+  const root = $('#pscreen'); const vals = liveValues();
+  applyLive(root, vals);
+  const spans = { temp: 4, pod: 40, power: 40 };
+  $$('[data-spark]', root).forEach(svg => { const k = svg.getAttribute('data-spark'); const pl = svg.firstChild; pl.setAttribute('points', sparkPoints(k, 60, spans[k])); });
+  const ring = $('[data-ring]', root);
+  if (ring) { const C = 2 * Math.PI * 36; ring.setAttribute('stroke-dashoffset', (C * (1 - S.u.batteryPct / 100)).toFixed(1)); }
+  const u = S.u;
+  $$('[data-tone]', root).forEach(t => {
+    const k = t.getAttribute('data-tone'); let tone = '';
+    if (k === 'temp') tone = u.batteryTempC > 55 ? 'red' : u.batteryTempC > 40 ? 'amber' : '';
+    if (k === 'voc') tone = u.podVoc > CONFIG.vocAlert ? 'red' : u.podVoc > CONFIG.vocRise ? 'amber' : '';
+    if (k === 'power') tone = u.powerW > CONFIG.currentFactor * expectedPower(u.batteryPct) ? 'red' : '';
+    t.classList.toggle('tone-amber', tone === 'amber'); t.classList.toggle('tone-red', tone === 'red');
+  });
+}
+
+/* ---------- Drag-to-scroll (mouse) inside phone ---------- */
+function initDragScroll() {
+  const v = $('#pview'); let d = null; let suppress = false;
+  v.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    if (e.target.closest('input')) return;
+    d = { y: e.clientY, st: v.scrollTop, moved: false };
+  });
+  window.addEventListener('pointermove', e => {
+    if (!d) return; const scale = currentScale(); const dy = (e.clientY - d.y) / scale;
+    if (!d.moved && Math.abs(dy) > 6) { d.moved = true; v.classList.add('dragging'); }
+    if (d.moved) v.scrollTop = d.st - dy;
+  });
+  window.addEventListener('pointerup', () => { if (d && d.moved) { suppress = true; setTimeout(() => { suppress = false; }, 0); } d = null; v.classList.remove('dragging'); });
+  v.addEventListener('click', e => { if (suppress) { e.stopPropagation(); e.preventDefault(); suppress = false; } }, true);
+}
+
+/* =====================================================================
+   MANAGER DASHBOARD
+   ===================================================================== */
+function unitState(b) { return b.id === 304 ? S.u.systemState : b.state; }
+function renderMgrStatic() {
+  $('#mgrLabel').innerHTML = icon('building', 15) + STRINGS.cols.mgr;
+  $('#bName').textContent = STRINGS.building.name;
+  $('#bSub').textContent = `${STRINGS.building.company} · ${STRINGS.building.units} units`;
+  $('#planChip').textContent = STRINGS.building.plan;
+  $('#legend').innerHTML = [['#E3E8ED', '#F3F5F7', 'Idle', 'solid'], ['#2ECC71', '#E7F8EE', 'Charging', 'solid'], ['#F5A623', '#FEF3DF', 'Warning / ambient', 'solid'], ['#B4232A', '#E5484D', 'Alert', 'solid'], ['#3B82F6', '#EAF1FE', 'Timer / resolved', 'solid'], ['#AEB7C0', '#fff', 'Offline', 'dashed']].map(([b, bg, l, s]) => `<span><i class="lg" style="border-color:${b};background:${bg};border-style:${s}"></i>${l}</span>`).join('') + `<span><i class="lg" style="border:0;background:#1A1A1A;border-radius:50%;width:8px;height:8px"></i>Live demo unit</span>`;
+  $('#liveUnitNote').innerHTML = '';
+}
+function renderKpis() {
+  const charging = Object.values(S.units).filter(b => unitState(b) === 'charging' || (b.id === 304 && ['warning', 'ambient'].includes(S.u.systemState))).length;
+  const online = Object.values(S.units).filter(b => b.state !== 'offline').length;
+  $('#onlineChip').innerHTML = `<span class="dot" aria-hidden="true"></span>${online} of 40 devices online`;
+  const k = [['charging', charging, 'Charging now'], ['alerts', S.kpi.alertsMonth, 'Alerts this month'], ['ambient', S.kpi.ambientFiltered, 'Ambient events filtered (false alarms avoided)'], ['avg', S.kpi.avgCharge, 'Avg. charge time']];
+  const el = $('#kpis');
+  if (!el.children.length) el.innerHTML = k.map(([id, v, l]) => `<div class="kpi" id="kpi-${id}"><div class="kpi-v num">${v}</div><div class="kpi-l">${l}</div></div>`).join('');
+  k.forEach(([id, v]) => { const box = $('#kpi-' + id); const vEl = box.firstChild; const s = String(v); if (vEl.textContent !== s) { vEl.textContent = s; box.classList.remove('bump'); void box.offsetWidth; box.classList.add('bump'); } });
+}
+function tileIcon(st) { return { idle: 'plug', charging: 'bolt', warning: 'thermo', ambient: 'vapor', alert: 'shieldX', timerStop: 'timer', acknowledged: 'shieldCheck', offline: 'wifiOff' }[st]; }
+function renderGrid() {
+  let h = '';
+  for (let f = 5; f >= 1; f--) {
+    h += `<div class="floor" aria-hidden="true">${f}</div>`;
+    for (let n = 1; n <= 8; n++) {
+      const id = f * 100 + n, b = S.units[id], st = unitState(b);
+      h += `<button class="utile st-${st} ${id === 304 ? 'live' : ''} ${st === 'alert' ? 'pulse' : ''}" data-act="unit" data-arg="${id}" data-unit="${id}" aria-label="Unit ${id}, ${STRINGS.states[st].label}"><span class="num">${id}</span>${icon(tileIcon(st), 14)}</button>`;
+    }
+  }
+  $('#ugrid').innerHTML = h;
+}
+function unitTip(el) {
+  const id = +el.getAttribute('data-unit'); const b = S.units[id]; const st = unitState(b);
+  const temp = id === 304 ? S.u.batteryTempC.toFixed(1) : b.temp.toFixed(1);
+  const tip = $('#utip');
+  tip.innerHTML = `<b>Unit ${id} · ${b.initials}</b>${STRINGS.states[st].label}${st === 'offline' ? '' : ` · ${temp} °C`}`;
+  const wrap = $('.ugrid-wrap'); let x = el.offsetLeft + el.offsetWidth / 2, y = el.offsetTop;
+  tip.style.left = '0px'; tip.style.top = '0px'; tip.classList.add('show');
+  const w = tip.offsetWidth; x = clamp(x - w / 2, 0, wrap.offsetWidth - w);
+  tip.style.left = x + 'px'; tip.style.top = (y - tip.offsetHeight - 6) + 'px';
+}
+function renderSpot() {
+  const u = S.u, M = STRINGS.states[u.systemState];
+  $('#spot').innerHTML = `<div class="spot-head"><div><div class="spot-name">Live unit 304 · ${STRINGS.tenant.name}</div><div class="mgr-sub">${STRINGS.tenant.battery}</div></div><span class="pill t-${M.tone}">${icon(M.icon, 14)} ${esc(M.label)}</span><button class="mbtn" style="height:34px;padding:0 12px" data-act="unit" data-arg="304">Open</button></div>
+   <div class="spot-grid"><div><div class="spot-v num"><span data-live="temp"></span>°</div><div class="spot-l">Battery °C</div></div><div><div class="spot-v num" data-live="voc"></div><div class="spot-l">Off-gas VOC</div></div><div><div class="spot-v num" data-live="power"></div><div class="spot-l">Power W</div></div><div><div class="spot-v num" data-live="relay"></div><div class="spot-l">Relay</div></div></div>`;
+}
+function addFeed(item) {
+  S.feed.unshift(item); if (S.feed.length > 40) S.feed.pop();
+  const list = $('#feedList'); const d = document.createElement('div'); d.innerHTML = feedItemHTML(item); list.prepend(d.firstChild);
+  while (list.children.length > 18) list.lastChild.remove();
+}
+function feedItemHTML(f) {
+  const ic = { alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer', ok: 'check', info: 'info' }[f.severity] || 'info';
+  return `<div class="feed-item sev-${f.severity}"><span class="sev-dot sv-${f.severity}">${icon(ic, 10)}</span><div><div class="feed-msg">${esc(f.message)}</div><div class="feed-time num">${fmtHM(f.time)}${sameDay(f.time) ? '' : ' · ' + fmtDay(f.time)}</div></div></div>`;
+}
+function renderFeed() { $('#feedList').innerHTML = S.feed.slice(0, 18).map(feedItemHTML).join(''); }
+function showBanner(kind, text) {
+  UI.banner = { kind, text };
+  const el = $('#mBanner');
+  el.className = 'mbanner show ' + (kind === 'red' ? 'b-red' : 'b-green');
+  el.innerHTML = `${icon(kind === 'red' ? 'shieldX' : 'shieldCheck', 24)}<span class="grow">${esc(text)}</span>${kind === 'red' ? '<button data-act="unit" data-arg="304">Open</button>' : ''}<button class="x" data-act="hideBanner" aria-label="Dismiss banner">${icon('x', 18)}</button>`;
+  $('#drawer').classList.add('pushdown');
+}
+function hideBanner() { UI.banner = null; $('#mBanner').className = 'mbanner'; $('#drawer').classList.remove('pushdown'); }
+function openDrawer(id) { UI.drawer = id; renderDrawer(); $('#drawer').classList.add('open'); $('#utip').classList.remove('show'); }
+function closeDrawer() { UI.drawer = null; $('#drawer').classList.remove('open'); }
+function unitEventsFor(id) {
+  if (id !== 304) return S.unitEvents[id] || [];
+  const live = S.log.filter(e => e.unit === 304).slice().reverse();
+  return live.concat(S.unitEvents[304] || []);
+}
+function renderDrawer() {
+  const id = UI.drawer; if (id == null) return;
+  const b = S.units[id], st = unitState(b), M = STRINGS.states[st], isLiveU = id === 304;
+  const u = S.u;
+  const ackInfo = isLiveU && u.lastAlert && u.lastAlert.ack && !u.alert ? u.lastAlert.ack : null;
+  const evs = unitEventsFor(id).slice(0, 5);
+  const rd = isLiveU
+    ? `<div><div class="v num"><span data-live="temp"></span>°</div><div class="l">Battery °C</div></div><div><div class="v num" data-live="voc"></div><div class="l">Off-gas VOC</div></div><div><div class="v num" data-live="room"></div><div class="l">Room VOC</div></div><div><div class="v num" data-live="power"></div><div class="l">Power W</div></div><div><div class="v num" data-live="relay"></div><div class="l">Relay</div></div>`
+    : st === 'offline' ? '<div style="grid-column:1/-1;color:var(--cs-grey-600);font-size:14px">No live readings. Device offline.</div>'
+      : `<div><div class="v num">${b.temp.toFixed(1)}°</div><div class="l">Battery °C</div></div><div><div class="v num">${b.voc}</div><div class="l">Off-gas VOC</div></div><div><div class="v num">44</div><div class="l">Room VOC</div></div><div><div class="v num">${b.power}</div><div class="l">Power W</div></div><div><div class="v">${b.state === 'charging' ? 'ON' : 'OFF'}</div><div class="l">Relay</div></div>`;
+  $('#drawer').innerHTML = `
+    <div class="dr-head"><button class="iconbtn" data-act="closeDrawer" aria-label="Close unit details">${icon('chevL', 20)}</button><div class="dr-title">Unit ${id}</div><span class="pill t-${M.tone} ${st === 'alert' ? 'pulse' : ''}">${icon(M.icon, 14)} ${esc(M.label)}</span></div>
+    <div class="dr-body">
+      ${ackInfo ? `<div class="safe-chip">${icon('shieldCheck', 22)} ${ackInfo.by === 'tenant' ? 'Tenant confirmed safe' : 'Alert acknowledged'} · <span class="num">${fmtHMS(ackInfo.t)}</span></div>` : ''}
+      ${isLiveU && u.alert ? `<div class="safe-chip" style="background:var(--red-bg);color:var(--red-ink)">${icon('shieldX', 22)} ${esc(STRINGS.alerts[u.alert.kind].banner.replace('Unit 304: ', ''))} · <span class="num">${fmtHMS(u.alert.t0)}</span></div>` : ''}
+      <div class="dr-sec"><div class="sec-title">Tenant</div>
+        <div class="dr-row"><span style="display:flex;align-items:center;gap:10px"><span class="avatar" style="width:34px;height:34px;font-size:13px">${isLiveU ? 'ML' : b.initials.replace(/\./g, '')}</span><span><b>${isLiveU ? STRINGS.tenant.name : 'Tenant ' + b.initials}</b><br><span class="k" style="font-size:13px">Floor ${b.floor}${isLiveU ? ' · ' + STRINGS.tenant.battery : ''}</span></span></span><span class="num k">${isLiveU ? STRINGS.tenant.phone : '514-555-01' + pad2(id % 100)}</span></div></div>
+      <div class="dr-sec"><div class="sec-title">Devices</div>
+        ${[['plug', 'Smart Plug'], ['pod', 'Sensor Pod'], ['box', 'Containment Box']].map(([ic, n]) => `<div class="dr-row"><span style="display:flex;align-items:center;gap:8px">${icon(ic, 18)} ${n}</span><span class="pill ${st === 'offline' ? 't-offline' : 't-green'}">${st === 'offline' ? icon('wifiOff', 13) + ' Offline' : icon('check', 13) + (ic === 'box' ? ' Lid closed' : ' Online')}</span></div>`).join('')}</div>
+      <div class="dr-sec"><div class="sec-title">Live readings</div><div class="dr-read">${rd}</div></div>
+      <div class="dr-sec"><div class="sec-title">Last 5 events</div>${evs.length ? evs.map(e => `<div class="dr-ev"><span class="sev-dot sv-${e.severity}" style="width:16px;height:16px">${icon({ alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer', ok: 'check' }[e.severity] || 'info', 10)}</span><span class="num k" style="width:62px;color:var(--cs-grey-600)">${sameDay(e.time) ? fmtHMS(e.time) : fmtDay(e.time).replace(/^\w+, /, '')}</span><span style="flex:1">${esc(e.message.replace(/^Unit \d+ · /, ''))}</span></div>`).join('') : '<div class="k">No events</div>'}</div>
+    </div>
+    <div class="dr-actions">
+      <button class="mbtn primary" data-act="mgrAck" ${isLiveU && u.alert ? '' : 'disabled'}>${icon('check', 18)} Acknowledge alert</button>
+      <button class="mbtn" data-act="callTenant" data-arg="${id}" ${st === 'offline' ? '' : ''}>${icon('phone', 18)} Call tenant</button>
+      <button class="mbtn" data-act="exportCsv" data-arg="${id}">${icon('download', 18)} Export incident report</button>
+    </div>`;
+  applyLive($('#drawer'), liveValues());
+}
+function showMgrModal(html) { const m = $('#mModal'); m.innerHTML = `<div class="box" role="dialog">${html}</div>`; m.classList.add('show'); }
+function hideMgrModal() { $('#mModal').classList.remove('show'); }
+function exportCsv(id) {
+  const rows = [['timestamp', 'unit', 'event', 'severity', 'message', 'battery_temp_c', 'pod_voc', 'room_voc', 'power_w', 'relay', 'action']];
+  const evs = unitEventsFor(id).slice().sort((a, b) => a.time - b.time);
+  evs.forEach(e => {
+    const r = e.readings || {}; const d = new Date(e.time);
+    const ts = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())} ${fmtHMS(e.time)}`;
+    rows.push([ts, id, e.type || 'history', e.severity, e.message, r.temp ?? '', r.pod ?? '', r.room ?? '', r.power ?? '', r.relay ?? '', e.action || '']);
+  });
+  const csv = rows.map(r => r.map(v => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob); const a = document.createElement('a');
+  const d = new Date(S.simMs);
+  a.href = url; a.download = `chargesentry-incident-unit-${id}-${d.getFullYear()}${pad2(d.getMonth() + 1)}${pad2(d.getDate())}-${pad2(d.getHours())}${pad2(d.getMinutes())}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  emit({ type: 'export', unit: id, severity: 'info', message: `Unit ${id} · Incident report exported`, readings: id === 304 ? readings() : null });
+}
+
+/* =====================================================================
+   DEVICE DIAGRAM
+   ===================================================================== */
+function renderDiagramStatic() {
+  $('#diagLabel').innerHTML = icon('plug', 15) + STRINGS.cols.diag;
+  const wisp = (x, y, d, cls) => `<g transform="translate(${x},${y})"><path class="wisp ${cls}" style="animation-delay:${d}s" d="M0 0c-6-8 6-14 0-22s6-14 0-22"/></g>`;
+  $('#diagWrap').innerHTML = `
+  <svg id="diagSvg" viewBox="0 0 660 420" role="img" aria-label="Live diagram: wall outlet, Smart Plug, charger, battery in the Containment Box with the Sensor Pod">
+    <defs><filter id="sh" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0F1419" flood-opacity=".14"/></filter></defs>
+    <rect x="0" y="0" width="16" height="420" fill="#EEF1F4"/>
+    <line x1="0" y1="372" x2="660" y2="372" stroke="#E3E8ED" stroke-width="2"/>
+    <!-- outlet -->
+    <rect x="18" y="168" width="56" height="104" rx="9" fill="#F7F8FA" stroke="#CBD3DA" stroke-width="1.5"/>
+    <rect x="30" y="226" width="32" height="34" rx="7" fill="#fff" stroke="#CBD3DA"/><rect x="38" y="236" width="3" height="10" rx="1.5" fill="#5B6670"/><rect x="51" y="236" width="3" height="10" rx="1.5" fill="#5B6670"/><circle cx="46" cy="252" r="2" fill="#5B6670"/>
+    <text x="46" y="290" font-size="12" font-weight="600" text-anchor="middle" fill="#5B6670">Wall outlet</text>
+    <!-- cables -->
+    <g id="cables">
+      <path class="cable" id="cabA" d="M140 208 C182 208 176 258 214 258"/>
+      <path class="flow" id="flowA" d="M140 208 C182 208 176 258 214 258"/>
+      <path class="cable" id="cabB" d="M312 258 C356 258 352 290 392 290 L456 290"/>
+      <path class="flow" id="flowB" d="M312 258 C356 258 352 290 392 290 L456 290"/>
+    </g>
+    <!-- smart plug -->
+    <g filter="url(#sh)"><rect x="40" y="172" width="100" height="74" rx="18" fill="#fff" stroke="#B9C2CA" stroke-width="1.5"/></g>
+    <text x="88" y="214" font-size="11" font-weight="800" text-anchor="middle" fill="#1A1A1A">ChargeSentry</text>
+    <circle class="led" id="ledPlug" cx="124" cy="186" r="5.5" fill="#2ECC71"/>
+    <g class="cutbadge" id="cutBadge"><circle cx="140" cy="172" r="15" fill="#E5484D" stroke="#fff" stroke-width="3"/><path d="M141 162l-7 10h5l-1 8 7-10h-5z" fill="#fff"/><path d="M131 163l18 18" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></g>
+    <text x="108" y="264" font-size="12" font-weight="600" text-anchor="middle" fill="#5B6670">Smart Plug</text>
+    <!-- charger -->
+    <rect x="214" y="236" width="98" height="46" rx="9" fill="#2B3138"/>
+    <text x="263" y="263" font-size="12" font-weight="700" text-anchor="middle" fill="#fff">Charger</text>
+    <text x="263" y="302" font-size="12" font-weight="600" text-anchor="middle" fill="#5B6670">Battery charger</text>
+    <!-- containment box -->
+    <rect x="392" y="128" width="246" height="210" rx="18" fill="#FAFBFC" stroke="#B9C2CA" stroke-width="3"/>
+    <rect x="384" y="116" width="262" height="20" rx="9" fill="#fff" stroke="#B9C2CA" stroke-width="2"/>
+    <text x="515" y="130" font-size="10" font-weight="800" text-anchor="middle" fill="#1A1A1A">ChargeSentry</text>
+    <rect x="598" y="150" width="22" height="50" rx="6" fill="#EEF1F4" stroke="#B9C2CA"/><text x="609" y="214" font-size="9" font-weight="700" text-anchor="middle" fill="#5B6670">Suppr.</text>
+    <!-- battery -->
+    <rect x="440" y="252" width="176" height="70" rx="12" fill="#39414A"/>
+    <rect x="452" y="246" width="16" height="8" rx="2" fill="#39414A"/><rect x="588" y="246" width="16" height="8" rx="2" fill="#39414A"/>
+    <text x="528" y="293" font-size="13" font-weight="700" text-anchor="middle" fill="#fff">48 V · 13 Ah</text>
+    <!-- wisps at battery -->
+    <g id="wispsBat" opacity="0">${wisp(470, 244, 0, 'wb')}${wisp(512, 240, 0.9, 'wb')}${wisp(584, 244, 1.7, 'wb')}${wisp(450, 246, 2.2, 'wb')}</g>
+    <!-- sensor pod -->
+    <g filter="url(#sh)"><rect x="496" y="212" width="64" height="42" rx="13" fill="#fff" stroke="#B9C2CA" stroke-width="1.5"/></g>
+    <circle class="led" id="ledPod" cx="546" cy="225" r="5" fill="#2ECC71"/>
+    <text x="520" y="242" font-size="10" font-weight="800" text-anchor="middle" fill="#1A1A1A">POD</text>
+    <text x="515" y="358" font-size="12" font-weight="600" text-anchor="middle" fill="#5B6670">Containment Box</text>
+    <!-- room wisps (ambient) -->
+    <g id="wispsRoom" opacity="0">${[40, 120, 200, 300, 360, 470, 560, 640].map((x, i) => wisp(x, i % 2 ? 150 : 390, (i * 0.37) % 2.8, 'wr')).join('')}</g>
+    <g id="ambLabel" opacity="0"><rect x="120" y="380" width="420" height="32" rx="16" fill="#FEF3DF" stroke="#F5A623"/><text x="330" y="401" font-size="13" font-weight="700" text-anchor="middle" fill="#8A5300">Room air also elevated: likely cooking. No action.</text></g>
+    <!-- callouts -->
+    <line x1="90" y1="104" x2="90" y2="172" stroke="#AEB7C0" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <g id="coPlug"><rect x="20" y="14" width="250" height="90" rx="14" fill="#fff" stroke="#E3E8ED" stroke-width="1.5"/>
+      <text x="36" y="36" font-size="11" font-weight="800" fill="#5B6670" letter-spacing="1">SMART PLUG</text>
+      <text x="36" y="70" font-size="30" font-weight="800" fill="#1A1A1A" class="num" id="coPower">0 W</text>
+      <text x="36" y="92" font-size="13" font-weight="600" fill="#5B6670" id="coPlugSub">Relay OFF · Room VOC 45</text></g>
+    <line x1="528" y1="104" x2="528" y2="212" stroke="#AEB7C0" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <g id="coPod"><rect id="coPodBox" x="364" y="14" width="282" height="90" rx="14" fill="#fff" stroke="#E3E8ED" stroke-width="1.5"/>
+      <text x="380" y="36" font-size="11" font-weight="800" fill="#5B6670" letter-spacing="1">SENSOR POD · AT THE BATTERY</text>
+      <text x="380" y="70" font-size="30" font-weight="800" fill="#1A1A1A" class="num" id="coPodMain">22.0 °C</text>
+      <text x="630" y="70" font-size="30" font-weight="800" fill="#1A1A1A" class="num" text-anchor="end" id="coPodVoc">VOC 50</text>
+      <text x="380" y="92" font-size="13" font-weight="600" fill="#5B6670" id="coPodSub">Normal</text></g>
+    <g id="coBox"><text x="515" y="376" font-size="13" font-weight="700" text-anchor="middle" fill="#17703D" id="coBoxTxt">✓ Battery inside · Lid closed</text></g>
+    <text x="352" y="246" font-size="11" font-weight="700" text-anchor="middle" fill="#5B6670" id="cableLbl"></text>
+  </svg>`;
+}
+const STATE_HEX = { idle: '#2ECC71', charging: '#2ECC71', warning: '#F5A623', ambient: '#F5A623', alert: '#E5484D', timerStop: '#3B82F6', acknowledged: '#3B82F6' };
+function diagUpdate() {
+  const u = S.u, st = u.systemState;
+  const flowing = isLive() && u.powerW > 1;
+  const cut = u.relay === 'cut';
+  ['flowA', 'flowB'].forEach(id => { const f = $('#' + id); f.classList.toggle('on', flowing); if (flowing) { const dur = (0.9 * CONFIG.powerNominal / Math.max(u.powerW, 30)).toFixed(2) + 's'; if (f.style.animationDuration !== dur) f.style.animationDuration = dur; f.style.stroke = u.powerW > CONFIG.currentFactor * expectedPower(u.batteryPct) ? '#E5484D' : '#2ECC71'; } });
+  $('#cabA').classList.toggle('dead', cut); $('#cabB').classList.toggle('dead', cut);
+  $('#cutBadge').classList.toggle('show', cut);
+  setText($('#cableLbl'), cut ? (u.testCut ? 'Test cut · power off' : 'Power cut') : flowing ? 'Power flowing' : 'Standby');
+  $('#cableLbl').setAttribute('fill', cut ? '#B4232A' : '#5B6670');
+  const led = STATE_HEX[st];
+  $('#ledPlug').setAttribute('fill', cut ? '#E5484D' : led); $('#ledPod').setAttribute('fill', led);
+  const v = liveValues();
+  setText($('#coPower'), `${v.power} W`);
+  setText($('#coPlugSub'), `Relay ${v.relay} · Room VOC ${v.room}`);
+  setText($('#coPodMain'), `${v.temp} °C`); setText($('#coPodVoc'), `VOC ${v.voc}`);
+  const podTone = (u.podVoc > CONFIG.vocAlert && u.roomVoc <= 140) || u.batteryTempC > 55 ? 'red' : (u.podVoc > CONFIG.vocRise || u.batteryTempC > CONFIG.heatWarnC) ? 'amber' : '';
+  $('#coPodBox').setAttribute('stroke', podTone === 'red' ? '#E5484D' : podTone === 'amber' ? '#F5A623' : '#E3E8ED');
+  $('#coPodBox').setAttribute('fill', podTone === 'red' ? '#FDECEC' : podTone === 'amber' ? '#FEF3DF' : '#fff');
+  const roomHigh = u.roomVoc > 140;
+  setText($('#coPodSub'), u.podVoc > CONFIG.vocRise ? (roomHigh ? 'Off-gas high, room air also high' : 'Off-gas rising at the battery only') : u.batteryTempC > CONFIG.heatWarnC ? 'Battery running warm' : 'Normal');
+  const wb = $('#wispsBat'), wr = $('#wispsRoom');
+  wb.setAttribute('opacity', roomHigh ? '0' : clamp((u.podVoc - 90) / 200, 0, 1).toFixed(2));
+  wr.setAttribute('opacity', clamp((u.roomVoc - 110) / 150, 0, 1).toFixed(2));
+  const wcol = u.podVoc > CONFIG.vocAlert ? '#E5484D' : '#F5A623';
+  if (wb.dataset.col !== wcol) { wb.dataset.col = wcol; $$('.wb', wb).forEach(p => p.setAttribute('stroke', wcol)); $$('.wr', wr).forEach(p => p.setAttribute('stroke', '#F5A623')); }
+  $('#ambLabel').setAttribute('opacity', (u.ambientActive || u.roomVoc > CONFIG.roomAmbientMin) ? '1' : '0');
+  const M = STRINGS.states[st];
+  const ds = $('#diagStatus'); const key = st + cut;
+  if (ds.dataset.k !== key) {
+    ds.dataset.k = key;
+    const msg = { idle: 'Plug ready. No current flowing.', charging: 'Plug, pod and box all report normal.', warning: 'Pod reports rising heat. Power stays on while it is watched.', ambient: 'Pod and room-air sensor rose together. Filtered as ambient, power stays on.', alert: 'Pod confirmed a problem. Plug cut power in 0.8 s.', timerStop: 'Plug cut power at the charge time limit.', acknowledged: 'Incident acknowledged. Power stays off until restarted.' }[st];
+    ds.innerHTML = `<span class="pill t-${M.tone}">${icon(M.icon, 14)} ${esc(M.label)}</span><span class="txt">${msg}</span>`;
+  }
+}
+function drawChart(cv, key, o) {
+  const dpr = 2; const W = cv.clientWidth || 600, H = cv.clientHeight || 150;
+  if (cv.width !== W * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+  const c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+  const pl = 34, pr = 10, pt = 8, pb = 8; const iw = W - pl - pr, ih = H - pt - pb;
+  const y = v => pt + (1 - (clamp(v, o.min, o.max) - o.min) / (o.max - o.min)) * ih;
+  c.font = '600 11px ' + getComputedStyle(document.body).fontFamily; c.textBaseline = 'middle';
+  c.fillStyle = '#5B6670'; c.strokeStyle = '#EEF1F4'; c.lineWidth = 1;
+  o.ticks.forEach(t => { c.beginPath(); c.moveTo(pl, y(t)); c.lineTo(W - pr, y(t)); c.stroke(); c.fillText(String(t), 4, y(t)); });
+  [[o.warn, '#C77C00', 'Warn'], [o.cut, '#E5484D', 'Cut']].forEach(([v, col, lab]) => {
+    c.save(); c.setLineDash([5, 4]); c.strokeStyle = col; c.lineWidth = 1.5; c.beginPath(); c.moveTo(pl, y(v)); c.lineTo(W - pr, y(v)); c.stroke(); c.restore();
+    c.fillStyle = col; c.font = '700 11px ' + getComputedStyle(document.body).fontFamily; c.fillText(`${lab} ${v}`, W - pr - 52, y(v) - 8);
+  });
+  const h = S.hist; const n = h.length;
+  c.beginPath(); h.forEach((p, i) => { const xx = pl + i / (CONFIG.histLen - 1) * iw; const yy = y(p[key]); i ? c.lineTo(xx, yy) : c.moveTo(xx, yy); });
+  c.strokeStyle = o.color; c.lineWidth = 2.5; c.lineJoin = 'round'; c.stroke();
+  if (o.key2) { c.beginPath(); h.forEach((p, i) => { const xx = pl + i / (CONFIG.histLen - 1) * iw; const yy = y(p[o.key2]); i ? c.lineTo(xx, yy) : c.moveTo(xx, yy); }); c.strokeStyle = '#AEB7C0'; c.lineWidth = 1.5; c.setLineDash([2, 3]); c.stroke(); c.setLineDash([]); c.fillStyle = '#5B6670'; c.fillText('room air', pl + 6, y(h[n - 1][o.key2]) - 8); }
+  const last = h[n - 1]; c.beginPath(); c.arc(pl + iw, y(last[key]), 4, 0, Math.PI * 2); c.fillStyle = o.color; c.fill();
+}
+function drawCharts() {
+  drawChart($('#chTemp'), 'temp', { min: 15, max: 65, ticks: [20, 40, 60], warn: CONFIG.heatWarnC, cut: CONFIG.criticalC, color: '#C77C00' });
+  drawChart($('#chVoc'), 'pod', { min: 0, max: 420, ticks: [0, 200, 400], warn: CONFIG.vocRise, cut: CONFIG.vocAlert, color: '#7C3AED', key2: 'room' });
+}
+
+/* =====================================================================
+   PRESENTER PANEL
+   ===================================================================== */
+const PP_BTNS = [['1', 'Start charge', 'k1'], ['2', 'Heat trend', 'k2'], ['3', 'Cooking vapour', 'k3'], ['4', 'Off-gas event', 'k4', 'hot'], ['5', 'Charger fault', 'k5'], ['6', 'Timer stop', 'k6'], ['0', 'Acknowledge', 'k0'], ['R', 'Reset demo', 'kR']];
+function renderPresenterStatic() {
+  $('#presenter').innerHTML = `
+    <div class="pp-h"><b>Presenter controls</b><button class="iconbtn pp-x" data-act="panel" aria-label="Close presenter controls">${icon('x', 18)}</button></div>
+    <div class="pp-row"><span>State</span><span class="pp-state" id="ppState"></span></div>
+    <div class="pp-read" style="margin-top:8px">
+      <div><div class="l">Batt °C</div><div class="v num" data-live="temp"></div></div><div><div class="l">Pod VOC</div><div class="v num" data-live="voc"></div></div><div><div class="l">Room VOC</div><div class="v num" data-live="room"></div></div>
+      <div><div class="l">Power W</div><div class="v num" data-live="power"></div></div><div><div class="l">Relay</div><div class="v num" data-live="relay"></div></div><div><div class="l">Battery %</div><div class="v num" data-live="pct"></div></div>
+    </div>
+    <div class="pp-sec"><div class="pp-t">Auto-play pitch script</div>
+      <div class="pp-row"><span id="ppScript">Ready</span><span class="num" id="ppScriptT"></span></div>
+      <div class="pp-next" id="ppNext"></div>
+      <div class="pp-grid" style="margin-top:8px"><button class="pp-btn wide" data-act="kSpace" id="ppPlay"></button></div></div>
+    <div class="pp-sec"><div class="pp-t">Scenarios</div><div class="pp-grid">${PP_BTNS.map(([k, l, a, c]) => `<button class="pp-btn ${c || ''}" data-act="${a}"><kbd>${k}</kbd>${l}</button>`).join('')}</div></div>
+    <div class="pp-sec"><div class="pp-t">Simulation speed</div><div class="pp-row"><button class="pp-btn" data-act="kMinus" aria-label="Slower">${icon('minus', 16)}<kbd>−</kbd></button><span class="pp-state num" id="ppSpeed"></span><button class="pp-btn" data-act="kPlus" aria-label="Faster"><kbd>+</kbd>${icon('plus', 16)}</button></div></div>
+    <div class="pp-sec"><div class="pp-t">Display</div><div class="pp-grid">
+      <button class="pp-btn" data-act="kM" id="ppSound"></button>
+      <button class="pp-btn" data-act="kC" id="ppCap"></button>
+      <button class="pp-btn wide" data-act="kF">${icon('full', 16)} Fullscreen <kbd>F</kbd></button></div></div>
+    <div class="pp-sec" style="color:#AEB7C0;line-height:1.5">Keys: <kbd>P</kbd> panel · <kbd>Space</kbd> script · <kbd>1</kbd>–<kbd>6</kbd> scenarios · <kbd>0</kbd> resolve · <kbd>R</kbd> reset · <kbd>+</kbd>/<kbd>−</kbd> speed · <kbd>M</kbd> sound · <kbd>C</kbd> captions · <kbd>F</kbd> fullscreen</div>`;
+  renderPresenter();
+}
+function renderPresenter() {
+  if (!S || !$('#ppState')) return;
+  setText($('#ppState'), STRINGS.states[S.u.systemState].title);
+  setText($('#ppSpeed'), speed() + '×');
+  const sc = S.script;
+  setText($('#ppScript'), sc.running ? (sc.paused ? 'Paused' : 'Running') : sc.finished ? 'Finished' : 'Ready');
+  const t = Math.floor(sc.t / 4); setText($('#ppScriptT'), sc.running || sc.finished ? `${Math.floor(t / 60)}:${pad2(t % 60)} / 1:30` : '');
+  const next = SCRIPT.slice(sc.running ? sc.idx : 0).find(s => s.label && !s.hidden);
+  setText($('#ppNext'), next ? `Next · ${Math.floor(next.at / 60)}:${pad2(next.at % 60)} · ${next.label}` : 'Script complete');
+  const play = $('#ppPlay'); const ph = `${icon(sc.running && !sc.paused ? 'pause' : 'play', 16)} ${sc.running ? (sc.paused ? 'Resume' : 'Pause') : 'Play script'} <kbd>Space</kbd>`; if (play.dataset.h !== ph) { play.dataset.h = ph; play.innerHTML = ph; }
+  const sh = `${icon(UI.soundOn ? 'sound' : 'mute', 16)} Sound ${UI.soundOn ? 'on' : 'off'} <kbd>M</kbd>`; const sEl = $('#ppSound'); if (sEl.dataset.h !== sh) { sEl.dataset.h = sh; sEl.innerHTML = sh; }
+  const ch = `${icon('cc', 16)} Captions ${UI.captionsOn ? 'on' : 'off'} <kbd>C</kbd>`; const cEl = $('#ppCap'); if (cEl.dataset.h !== ch) { cEl.dataset.h = ch; cEl.innerHTML = ch; }
+}
+function togglePanel(force) { UI.panelOpen = force != null ? force : !UI.panelOpen; $('#presenter').classList.toggle('open', UI.panelOpen); $('#gearBtn').setAttribute('aria-label', UI.panelOpen ? 'Close presenter controls (P)' : 'Open presenter controls (P)'); }
+function setSpeed(idx) { S.speedIdx = (idx + CONFIG.speeds.length) % CONFIG.speeds.length; setText($('#tbSpeed'), speed() + '× speed'); renderPresenter(); }
+function showCaption(text) {
+  if (!UI.captionsOn || !text) return;
+  const el = $('#caption'); el.textContent = text; el.classList.add('show');
+  clearLater(UI.captionT); UI.captionT = later(() => el.classList.remove('show'), CONFIG.captionMs);
+}
+function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) { const p = document.exitFullscreen(); if (p && p.catch) p.catch(() => {}); }
+    else { const p = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (p && p.catch) p.catch(() => {}); }
+  } catch (e) { logError(e); }
+}
+
+/* =====================================================================
+   SCENARIOS (scripted pitch, deterministic, tick-driven)
+   ===================================================================== */
+const SCRIPT = [
+  { at: 0, label: 'Idle at home screen', caption: 'Maya plugs in her e-bike for the night.' },
+  { at: 5, label: 'Start charge', caption: 'ChargeSentry watches every second of the charge.', fn: () => startCharge() },
+  { at: 20, label: 'Cooking vapour (pod + room air)', caption: "Dinner's cooking. Both sensors see it.", fn: () => startScenario('cooking', { rise: 8, hold: 10 }) },
+  { at: 28, label: 'Ambient filter, no cut', caption: 'No false alarm. Charging continues.' },
+  { at: 40, label: 'Values back to normal' },
+  { at: 48, label: 'Off-gas at the battery only', caption: 'A cell starts to fail. Only the pod sees it.', fn: () => startScenario('offgas', { ramp: 16 }) },
+  { at: 60, label: 'Automatic power cut', caption: 'Power cut automatically, before any smoke.' },
+  { at: 61.5, hidden: true, fn: () => { if (!S.u.alert && !S.u.acknowledged) triggerAlert('offgas'); } },
+  { at: 70, label: 'Manager opens unit 304', caption: 'The building manager knows at the same moment.', fn: () => openDrawer(304) },
+  { at: 80, label: "Tenant taps \"I'm safe\"", caption: "Everyone's informed. The incident is logged.", fn: () => simTapSafe() },
+  { at: 90, label: 'End', fn: () => endScript() }
+];
+function startScript() {
+  resetDemo();
+  S.script = { running: true, paused: false, t: 0, idx: 0, finished: false };
+  setSpeed(0);
+  renderPresenter();
+}
+function scriptTick() {
+  const sc = S.script; if (!sc.running || sc.paused) return;
+  while (sc.idx < SCRIPT.length && SCRIPT[sc.idx].at * 4 <= sc.t) {
+    const s = SCRIPT[sc.idx++];
+    try { if (s.fn) s.fn(); } catch (e) { logError(e); }
+    if (s.caption) showCaption(s.caption);
+  }
+  sc.t++;
+  renderPresenter();
+}
+function toggleScript() {
+  const sc = S.script;
+  if (!sc.running) { startScript(); return; }
+  sc.paused = !sc.paused; S.paused = sc.paused; renderPresenter();
+}
+function endScript() { S.script.running = false; S.script.finished = true; S.paused = false; renderPresenter(); }
+function simTapSafe() {
+  if (!S.u.alert) return;
+  if (UI.overlay !== 'alert') openAlertOverlay();
+  UI.sheet = null; renderOverlay();
+  const b = $('#btnSafe'); if (b) { b.classList.add('sim-tap'); }
+  later(() => tenantSafe(), 380);
+}
+function tenantSafe() {
+  if (!acknowledge('tenant')) return;
+  UI.overlay = 'alert'; renderOverlay(); renderPhone();
+}
+
+/* ---------- Bus subscribers (keep every view in sync) ---------- */
+function initSubscribers() {
+  Bus.on('state', () => {
+    renderPhone(); renderGrid(); renderKpis(); renderSpot(); if (UI.drawer != null) renderDrawer(); renderPresenter(); updateLogoDot();
+  });
+  Bus.on('event', e => {
+    // ticker
+    if (e.type !== 'export') renderTickerItem(e);
+    // manager feed
+    if (!['charge_stop', 'test_done', 'pair'].includes(e.type)) addFeed({ time: e.time, unit: e.unit, severity: e.severity, message: e.message });
+    // tenant alerts list
+    if (['alert', 'warning', 'ambient', 'timer'].includes(e.type)) {
+      const a = { id: 'e' + e.id, time: e.time, type: e.type, sev: e.type === 'alert' ? 'alert' : e.type === 'timer' ? 'timer' : e.type, title: e.type === 'alert' ? STRINGS.alerts[e.kind].hero : e.title, detail: e.type === 'alert' ? STRINGS.alerts[e.kind].notif : e.type === 'ambient' ? 'Room air also elevated, likely cooking. Charging continued.' : e.type === 'warning' ? `Battery reached ${e.readings.temp} °C. Power stayed on.` : `Stopped at your ${S.u.timerLimitH} h limit.`, read: false, resolved: e.type !== 'alert', live: true, readings: e.readings, alertObj: e.type === 'alert' ? S.u.alert : null };
+      S.tenantAlerts.unshift(a);
+    }
+    if (e.type === 'alert') {
+      const A = STRINGS.alerts[e.kind];
+      shakePhone(); Sound.play('alert');
+      UI.sheet = null; UI.overlay = 'alert';
+      showNotif({ title: A.title, body: A.notif, sev: 'alert', target: { overlay: 'alert' } });
+      showBanner('red', A.banner);
+      renderPhone(); renderKpis();
+      if (UI.drawer === 304) renderDrawer();
+    } else if (e.type === 'ack') {
+      showBanner('green', e.by === 'tenant' ? 'Unit 304: Tenant confirmed safe' : 'Unit 304: Alert acknowledged by manager');
+      if (e.by === 'manager') { showNotif({ title: 'Building manager acknowledged', body: 'Gestion Laurier Inc. saw the alert and is following up.', sev: 'ok', target: { overlay: 'alert' } }); Sound.play('info'); }
+      renderPhone(); if (UI.drawer === 304) renderDrawer();
+    } else if (e.notify && S.settings.push) {
+      const sevMap = { warning: 'warning', ambient: 'ambient', timer: 'timer', complete: 'ok' };
+      const bodies = { warning: `Battery at ${e.readings.temp} °C. Power is still on. ChargeSentry is watching closely.`, ambient: 'Room vapour detected, likely cooking. Monitoring.', timer: `Your ${S.u.timerLimitH} h charge timer was reached. Power is off.`, complete: 'Battery is full. Power is off.' };
+      const last = S.tenantAlerts[0];
+      showNotif({ title: e.title, body: bodies[e.type] || e.message, sev: sevMap[e.type] || 'info', target: last && last.id === 'e' + e.id ? { alert: last.id } : { tab: 'home' } });
+      Sound.play(e.type === 'warning' ? 'warning' : 'info');
+      renderPhone(); renderKpis();
+    } else if (e.notify) { renderPhone(); renderKpis(); }
+    if (UI.drawer === e.unit && e.type !== 'alert' && e.type !== 'ack') renderDrawer();
+  });
+}
+function renderTickerItem(e) {
+  const el = $('#tkItems');
+  const ic = { alert: 'shieldX', warning: 'thermo', ambient: 'vapor', timer: 'timer', ok: 'check', info: 'info' }[e.severity] || 'info';
+  const d = document.createElement('div'); d.className = 'tk-item';
+  d.innerHTML = `<span class="sev-dot sv-${e.severity}">${icon(ic, 11)}</span><span class="tk-time num">${fmtHMS(e.time)}</span><span>${esc(e.message)}</span>`;
+  el.prepend(d); while (el.children.length > 3) el.lastChild.remove();
+}
+function updateLogoDot() { const d = $('#logoDot'); if (d) d.setAttribute('fill', STATE_HEX[S.u.systemState]); const sd = $('#simDot'); if (sd) sd.style.background = STATE_HEX[S.u.systemState]; }
+
+/* ---------- Render loop for live values ---------- */
+function renderLive() {
+  try {
+    const v = liveValues();
+    applyLive($('#topbar'), v);
+    phoneLive();
+    applyLive($('#spot'), v);
+    if (UI.drawer === 304) applyLive($('#drawer'), v);
+    applyLive($('#presenter'), v);
+    applyLive($('#diagCard'), v);
+    diagUpdate(); drawCharts(); renderPresenter();
+  } catch (e) { logError(e); }
+}
+
+/* ---------- Reset ---------- */
+function resetDemo() {
+  const t0 = performance.now();
+  clearAllLater(); clearPairTimers();
+  S = initialState();
+  Object.assign(UI, { tab: 'home', stack: [], overlay: null, sheet: null, drawer: null, banner: null, histWeek: 0, lastScreenKey: '', pair: null, notifTarget: null });
+  hideNotif(); hideBanner(); closeDrawer(); hideMgrModal();
+  $('#caption').classList.remove('show'); $('#phoneHolder').classList.remove('shake');
+  $('#tkItems').innerHTML = ''; $('#kpis').innerHTML = '';
+  setSpeed(CONFIG.defaultSpeedIdx);
+  renderGrid(); renderKpis(); renderSpot(); renderFeed(); renderPhone(false); updateLogoDot(); renderLive();
+  window.__lastResetMs = performance.now() - t0;
+}
+
+/* ---------- Input: clicks ---------- */
+const ACTIONS = {
+  tab: a => setTab(a), nav: a => nav(a), back: () => back(), device: a => nav('device', a),
+  startCharge: () => startCharge(), stopCharge: () => stopCharge(), testCut: () => testCut(),
+  openAlert: () => openAlertOverlay(), closeAlert: () => { closeAlertOverlay(); renderPhone(); },
+  imSafe: () => tenantSafe(),
+  call: a => { UI.sheet = a === '911' ? 'call911' : 'callmgr'; renderOverlay(); },
+  sheet: a => { UI.sheet = a; renderOverlay(); }, closeSheet: () => { UI.sheet = null; renderOverlay(); },
+  histWeek: a => { UI.histWeek = +a; renderPhone(); },
+  alertItem: a => { const it = S.tenantAlerts.find(x => x.id === a); if (!it) return; it.read = true; if (it.sev === 'alert' && S.u.alert && !it.resolved) { openAlertOverlay(); renderTabbar(); renderPhone(); return; } nav('alertDetail', a); },
+  toggle: a => { if (a === 'share') return; S.settings[a] = !S.settings[a]; renderPhone(); },
+  pairDone: () => { UI.pair = null; back(); },
+  unit: a => openDrawer(+a), closeDrawer: () => closeDrawer(), hideBanner: () => hideBanner(),
+  mgrAck: () => { acknowledge('manager'); },
+  callTenant: a => { const id = +a; showMgrModal(`<div class="avatar" style="width:64px;height:64px;margin:0 auto 10px;font-size:22px">${icon('phone', 28)}</div><div style="font-size:20px;font-weight:800">Calling ${id === 304 ? STRINGS.tenant.name : 'tenant of unit ' + id}…</div><div class="mgr-sub" style="margin:6px 0 14px">Simulated call. This demo never dials.</div><button class="mbtn primary" style="width:100%" data-act="hideModal">End call</button>`); },
+  hideModal: () => hideMgrModal(),
+  exportCsv: a => exportCsv(+a),
+  panel: () => togglePanel(),
+  k1: () => keyAction('1'), k2: () => keyAction('2'), k3: () => keyAction('3'), k4: () => keyAction('4'), k5: () => keyAction('5'), k6: () => keyAction('6'), k0: () => keyAction('0'), kR: () => keyAction('r'),
+  kSpace: () => keyAction(' '), kPlus: () => keyAction('+'), kMinus: () => keyAction('-'), kM: () => keyAction('m'), kC: () => keyAction('c'), kF: () => keyAction('f')
+};
+function onClick(e) {
+  try {
+    const wasUnlocked = Sound.unlocked;
+    Sound.unlock();
+    if (e.target.closest('#soundHint')) { if (wasUnlocked) toggleSound(); renderSoundChip(); return; }
+    if (e.target.closest('#splash')) { hideSplash(); return; }
+    if (e.target.closest('#pnotif')) { const t = UI.notifTarget; hideNotif(); if (t) { if (t.overlay) openAlertOverlay(); else if (t.alert) { const it = S.tenantAlerts.find(x => x.id === t.alert); if (it) it.read = true; UI.tab = 'alerts'; UI.stack = [{ name: 'alertDetail', arg: t.alert }]; renderPhone(false); } else setTab(t.tab || 'home'); } return; }
+    if (e.target.closest('#gearBtn')) { togglePanel(); return; }
+    const el = e.target.closest('[data-act]'); if (!el) return;
+    if (el.dataset.act === 'closeSheet' && e.target.closest('[data-stop]') && !e.target.closest('button')) return;
+    if (el.tagName === 'INPUT') return;
+    if (el.disabled) return;
+    const fn = ACTIONS[el.dataset.act]; if (fn) fn(el.dataset.arg);
+    if (el.closest('#presenter') && el.blur) el.blur();
+    renderLive();
+  } catch (err) { logError(err); }
+}
+function onInput(e) {
+  try {
+    const el = e.target; if (el.dataset.act !== 'timerRange') return;
+    S.u.timerLimitH = +el.value; setText($('#timerVal'), el.value + ' h'); renderLive();
+  } catch (err) { logError(err); }
+}
+
+/* ---------- Input: keyboard ---------- */
+function keyAction(k) {
+  switch (k) {
+    case '1': startCharge(); break;
+    case '2': startScenario('heat'); break;
+    case '3': startScenario('cooking'); break;
+    case '4': startScenario('offgas'); break;
+    case '5': startScenario('fault'); break;
+    case '6': startScenario('timer'); break;
+    case '0': resolveActive(); break;
+    case 'r': resetDemo(); break;
+    case '+': setSpeed(S.speedIdx + 1); break;
+    case '-': setSpeed(S.speedIdx - 1); break;
+    case ' ': toggleScript(); break;
+    case 'm': toggleSound(); break;
+    case 'c': UI.captionsOn = !UI.captionsOn; if (!UI.captionsOn) $('#caption').classList.remove('show'); renderPresenter(); break;
+    case 'f': toggleFullscreen(); break;
+    case 'p': togglePanel(); break;
+  }
+  renderLive();
+}
+function onKey(e) {
+  try {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    Sound.unlock();
+    let k = e.key; if (k === 'Escape') { if (UI.panelOpen) togglePanel(false); return; }
+    k = k.length === 1 ? k.toLowerCase() : k;
+    if (k === '=') k = '+'; if (k === '_') k = '-';
+    if (k === 'Spacebar') k = ' ';
+    if (!['1', '2', '3', '4', '5', '6', '0', 'r', '+', '-', ' ', 'm', 'c', 'f', 'p'].includes(k)) return;
+    if (k === ' ' || e.target.tagName === 'INPUT') e.preventDefault();
+    if (e.repeat) return;
+    if (!UI.splashDone) hideSplash();
+    keyAction(k);
+  } catch (err) { logError(err); }
+}
+
+/* ---------- Layout scaling ---------- */
+let SCALE = 1;
+function currentScale() { return SCALE; }
+function fit() {
+  const w = window.innerWidth, h = window.innerHeight;
+  SCALE = Math.min(w / 1920, h / 1080);
+  const x = (w - 1920 * SCALE) / 2, y = (h - 1080 * SCALE) / 2;
+  $('#stage').style.transform = `translate(${x}px,${y}px) scale(${SCALE})`;
+}
+function hideSplash() { if (UI.splashDone) return; UI.splashDone = true; const s = $('#splash'); s.classList.add('hide'); setTimeout(() => { s.style.display = 'none'; }, 450); }
+
+/* ---------- Boot ---------- */
+function boot() {
+  window.addEventListener('error', e => { logError(e.error || e.message); e.preventDefault && e.preventDefault(); });
+  window.addEventListener('unhandledrejection', e => { logError(e.reason); e.preventDefault(); });
+  $('#logo').innerHTML = logoSvg(34, 'logoDot') + '<span>ChargeSentry</span>';
+  $('#gearBtn').innerHTML = icon('gear', 18);
+  $('#phoneLabel').innerHTML = icon('phone', 15) + STRINGS.cols.phone;
+  $('#protoBadge').textContent = STRINGS.badge;
+  $('#sbIcons').innerHTML = statusIcons();
+  $('#splash').innerHTML = logoSvg(96) + '<div class="wm">ChargeSentry</div><div class="p-sub">Safer charging, every night</div>';
+  $('#tbDate').textContent = new Date().toLocaleDateString('en-CA', { weekday: 'long', month: 'long', day: 'numeric' });
+  renderMgrStatic(); renderDiagramStatic(); renderPresenterStatic();
+  initSubscribers(); initDragScroll();
+  document.addEventListener('click', onClick);
+  document.addEventListener('input', onInput);
+  document.addEventListener('keydown', onKey);
+  document.addEventListener('keyup', e => { if (e.key === ' ') e.preventDefault(); });
+  $('#ugrid').addEventListener('mouseover', e => { const t = e.target.closest('.utile'); if (t) unitTip(t); });
+  $('#ugrid').addEventListener('mouseleave', () => $('#utip').classList.remove('show'));
+  window.addEventListener('resize', fit);
+  fit();
+  resetDemo();
+  renderSoundChip();
+  setTimeout(hideSplash, 1500);
+  setInterval(tick, CONFIG.tickMs);
+}
+boot();
+</script>
+</body>
+</html>
